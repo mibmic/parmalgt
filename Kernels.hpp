@@ -74,7 +74,7 @@ namespace kernels {
       // use this to check if the multithreaded version gives 
       // identical results to the single threaded one
       tmp[0] -= stau*SU3rand(rands.at(n));
-      U[n][mu] = exp<bgf::AbelianBgf, ORD>(tmp)*U[n][mu]; // back to SU3
+      U[n][mu] = exp<BGF, ORD>(tmp)*U[n][mu]; // back to SU3
       //#pragma omp critical // TODO maybe one can use a reduce or so here
       M[omp_get_thread_num()] += get_q(U[n][mu]); // zero momentum contribution
     }
@@ -130,8 +130,8 @@ private:
     for (Direction mu; mu.is_good(); ++mu)
       omega += U[n][mu] - U[n - mu][mu];
     
-    ptSU3 Omega = exp<bgf::AbelianBgf, ORD>( -alpha * omega.reH());
-    ptSU3 OmegaDag = exp<bgf::AbelianBgf, ORD>( alpha * omega.reH());
+    ptSU3 Omega = exp<BGF, ORD>( -alpha * omega.reH());
+    ptSU3 OmegaDag = exp<BGF, ORD>( alpha * omega.reH());
     
     for (Direction mu; mu.is_good(); ++mu){
       U[n][mu] = Omega * U[n][mu];
@@ -145,8 +145,8 @@ private:
       omega += (U[n][mu] * dag(U[n][mu].bgf()) *
             dag( U[n - mu][mu] ) * U[n - mu][mu].bgf());
     }
-    ptSU3 Omega = exp<bgf::AbelianBgf, ORD>( alpha * omega.reH());
-    ptSU3 OmegaDag = exp<bgf::AbelianBgf, ORD>( -alpha * omega.reH());
+    ptSU3 Omega = exp<BGF, ORD>( alpha * omega.reH());
+    ptSU3 OmegaDag = exp<BGF, ORD>( -alpha * omega.reH());
     for (Direction mu; mu.is_good(); ++mu){
       U[n][mu] = Omega * U[n][mu];
       U[n - mu][mu] *= OmegaDag;
@@ -158,11 +158,11 @@ private:
     omega.zero();
     for (Direction mu; mu.is_good(); ++mu){
       ptSU3 Udag = dag(U[n - mu][mu]);
-      bgf::AbelianBgf Vdag = U[n][mu].bgf().dag(), V = Udag.bgf().dag();
+      BGF Vdag = U[n][mu].bgf().dag(), V = Udag.bgf().dag();
       omega += U[n][mu]*Vdag*Udag*V;
     }
-    ptSU3 Omega = exp<bgf::AbelianBgf, ORD>( -alpha * omega.reH());
-    ptSU3 OmegaDag = exp<bgf::AbelianBgf, ORD>( alpha * omega.reH());
+    ptSU3 Omega = exp<BGF, ORD>( -alpha * omega.reH());
+    ptSU3 OmegaDag = exp<BGF, ORD>( alpha * omega.reH());
     for (Direction mu; mu.is_good(); ++mu){
       U[n][mu] = Omega * U[n][mu];
       U[n - mu][mu] *= OmegaDag;
@@ -206,7 +206,7 @@ private:
     ///  \author Dirk Hesse <herr.dirk.hesse@gmail.com>
     ///  \date Thu May 24 17:51:17 2012
   ZeroModeSubtractionKernel(const Direction& nu, const ptsu3& N) :
-    mu(nu), M(exp<bgf::AbelianBgf, ORD>(-1*reH(N))) { }
+    mu(nu), M(exp<BGF, ORD>(-1*reH(N))) { }
   void operator()(GluonField& U, const Point& n) {
     U[n][mu] = M * U[n][mu];
   }
@@ -236,7 +236,17 @@ private:
         U[n][mu].bgf() =  bgf::get_abelian_bgf(t, mu);
     }
   };
-
+  template <int ORD,int DIM>
+  struct SetBgfKernel<bgf::ScalarBgf, ORD, DIM> {
+    typedef BGptSU3<bgf::ScalarBgf, ORD> ptSU3;
+    typedef ptt::PtMatrix<ORD> ptsu3;
+    typedef BGptGluon<bgf::ScalarBgf, ORD, DIM> ptGluon;
+    typedef pt::Point<DIM> Point;
+    typedef pt::Direction<DIM> Direction;
+    typedef fields::LocalField<ptGluon, DIM> GluonField;
+    explicit SetBgfKernel(const int& )  { }
+    void operator()(GluonField& , const Point& ) const { }
+  };
   
   //////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////
@@ -283,10 +293,10 @@ private:
     typedef pt::Direction<DIM> Direction;
     typedef fields::LocalField<ptGluon, DIM> GluonField;
     ptSU3 val;
-    PlaqLowerKernel () : val(bgf::zero<bgf::AbelianBgf>()) { }
+    PlaqLowerKernel () : val(bgf::zero<BGF>()) { }
     void operator()(GluonField& U, const Point& n){
       Direction t(0);
-      ptSU3 tmp(bgf::zero<bgf::AbelianBgf>());
+      ptSU3 tmp(bgf::zero<BGF>());
       for (Direction k(1); k.is_good(); ++k)
         tmp += U[n][k].bgf() * U[n + k][t] * 
           dag( U[n +t][k] ) * dag( U[n][t] );
@@ -318,10 +328,10 @@ private:
     typedef fields::LocalField<ptGluon, DIM> GluonField;
 
   ptSU3 val;
-  PlaqUpperKernel () : val(bgf::zero<bgf::AbelianBgf>()) { }
+  PlaqUpperKernel () : val(bgf::zero<BGF>()) { }
   void operator()(GluonField& U, const Point& n){
     Direction t(0);
-    ptSU3 tmp(bgf::zero<bgf::AbelianBgf>());
+    ptSU3 tmp(bgf::zero<BGF>());
     for (Direction k(1); k.is_good(); ++k)
       tmp += dag( U [n + t][k].bgf() ) * dag( U[n][t] ) *
               U[n][k] * U[n + k][t];
@@ -348,9 +358,9 @@ private:
     typedef pt::Direction<DIM> Direction;
     typedef fields::LocalField<ptGluon, DIM> GluonField;
     ptSU3 val;
-    PlaqSpatialKernel () : val(bgf::zero<bgf::AbelianBgf>()) { }
+    PlaqSpatialKernel () : val(bgf::zero<BGF>()) { }
     void operator()(GluonField& U, const Point& n){
-      ptSU3 tmp(bgf::zero<bgf::AbelianBgf>());
+      ptSU3 tmp(bgf::zero<BGF>());
       for (Direction k(1); k.is_good(); ++k)
         for (Direction l(k + 1); l.is_good(); ++l)
           tmp += U[n][k] * U[n + k][l]
