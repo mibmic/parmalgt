@@ -130,8 +130,8 @@ private:
     for (Direction mu; mu.is_good(); ++mu)
       omega += U[n][mu] - U[n - mu][mu];
     
-    ptSU3 Omega = exp<BGF, ORD>( -alpha * omega.reH());
-    ptSU3 OmegaDag = exp<BGF, ORD>( alpha * omega.reH());
+    ptSU3 Omega = exp<BGF, ORD>(  alpha * omega.reH());
+    ptSU3 OmegaDag = exp<BGF, ORD>( -alpha * omega.reH());
     
     for (Direction mu; mu.is_good(); ++mu){
       U[n][mu] = Omega * U[n][mu];

@@ -45,7 +45,7 @@ int NRUN;
 // frequency of measurements
 int MEAS_FREQ;
 // testing gauge fixing option -- DO NOT TOUCH!
-const int GF_MODE = 3;
+const int GF_MODE = 1;
 // integration step and gauge fixing parameter
 double taug;
 double alpha;
