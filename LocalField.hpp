@@ -94,7 +94,7 @@ namespace fields {
     }
     
     pt::Point<DIM> mk_point(const typename geometry::Geometry<DIM>::raw_pt_t& n){
-      g.mk_point(n);
+      return g.mk_point(n);
     }
     geometry::SliceIterator<DIM, 0> mk_slice_iterator 
     (const pt::Direction<DIM> mu, const int& xi){
@@ -179,6 +179,10 @@ namespace fields {
                              rec_buffer[3].first);
     }
 #endif
+
+    pt::Point<DIM> begin() { return g.begin(); }
+    pt::Point<DIM> end()   { return g.end(); }
+
   private:
     geometry::Geometry<DIM> g;
     rep_t rep;

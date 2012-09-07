@@ -80,6 +80,7 @@ typedef kernels::PlaqLowerKernel<Bgf_t, ORD, DIM> PlaqLowerKernel;
 typedef kernels::PlaqUpperKernel<Bgf_t, ORD, DIM> PlaqUpperKernel;
 typedef kernels::PlaqSpatialKernel<Bgf_t, ORD, DIM> PlaqSpatialKernel;
 typedef kernels::MeasureNormKernel<Bgf_t, ORD, DIM> MeasureNormKernel;
+typedef kernels::PlaqKernel<Bgf_t, ORD, DIM> PlaqKernel;
 
 // ... and for the checkpointing.
 typedef kernels::FileWriterKernel<Bgf_t, ORD, DIM> FileWriterKernel;
@@ -142,6 +143,31 @@ void measure(GluonField &U){
   tmp = Ps.val / 3 / V3 / (T-1);
   tree = tmp.bgf().Tr();
   io::write_file<ptSU3, ORD>(tmp, tree, "ss_plaq.bindat");
+
+  PlaqKernel Pq;
+  for (int t = 0; t < T; ++t)
+    U.apply_everywhere(Ps);
+    //meas_on_timeslice(U, t, Ps);
+  tmp = Pq.val / (12.0 * V3*T);
+  tree = tmp.bgf().Tr();
+  io::write_file<ptSU3, ORD>(tmp, tree, "all_plaq.bindat");
+
+
+}
+
+
+// Our measurement
+void measure_plaquette(GluonField &U){
+
+  // shorthand for V3*T
+  int V = L*L*L*T;
+
+  PlaqKernel Pq;
+  U.apply_everywhere(Pq);
+  ptSU3 tmp = Pq.val / (18.0*V) ;
+  Cplx tree = tmp.bgf().Tr();
+  io::write_file<ptSU3, ORD>(tmp, tree, "all_plaq.bindat");
+
 }
 
 // timing
@@ -212,8 +238,8 @@ int main(int argc, char *argv[]) {
   //
   // random number generators
   srand(atoi(p["seed"].c_str()));
-  GaugeUpdateKernel::rands.resize(L*L*L*(T+1));
-  for (int i = 0; i < L*L*L*(T+1); ++i)
+  GaugeUpdateKernel::rands.resize(L*L*L*T);
+  for (int i = 0; i < L*L*L*T; ++i)
     GaugeUpdateKernel::rands[i].init(rand());
   ////////////////////////////////////////////////////////////////////
   //
@@ -222,8 +248,8 @@ int main(int argc, char *argv[]) {
   geometry::Geometry<DIM>::extents_t e;
   // we want a L = 4 lattice
   std::fill(e.begin(), e.end(), L);
-  // for SF boundary: set the time extend to T + 1
-  e[0] = T + 1;
+  // for SF boundary: set the time extend to T
+  e[0] = T;
   // we will have just one field
   GluonField U(e, 1, 0, nt());
   // initialize background field get method
@@ -240,6 +266,7 @@ int main(int argc, char *argv[]) {
     FileReaderKernel fr(p);
     U.apply_everywhere(fr);
   }
+
   ////////////////////////////////////////////////////////////////////
   //
   // start the simulation
@@ -248,12 +275,12 @@ int main(int argc, char *argv[]) {
       std::cout << i_;
       MeasureNormKernel m(ORD + 1);
       U.apply_everywhere(m);
-      for (int i = 0 ; i < m.norm.size(); ++i)
-        std::cout << " " << m.norm[i];
-      std::cout << "\n";
-      timings["measurements"].start();
-      measure(U);
-      timings["measurements"].stop();
+       for (int i = 0 ; i < m.norm.size(); ++i)
+         std::cout << " " << m.norm[i];
+       std::cout << "\n";
+       //        timings["measurements"].start();
+       //       measure(U);
+       //       timings["measurements"].stop();
     }
     ////////////////////////////////////////////////////////
     //
@@ -262,28 +289,36 @@ int main(int argc, char *argv[]) {
     for (Direction mu; mu.is_good(); ++mu)
       gu.push_back(GaugeUpdateKernel(mu, taug));
     timings["Gauge Update"].start();
-    // for x_0 = 0 update the temporal direction only
-    U.apply_on_timeslice(gu[0], 0);
-    // for x_0 != 0 update all directions
-    for (int t = 1; t < T; ++t)
+
+    // update all directions
+    for (int t = 0; t < T; ++t)
       for (Direction mu; mu.is_good(); ++mu)
         U.apply_on_timeslice(gu[mu], t);
 
     timings["Gauge Update"].stop();
+
+    std::vector<Cplx> plaq(ORD+1);
+    for (Direction mu; mu.is_good(); ++mu)
+      for( int i = 0; i < gu[mu].plaq.size(); ++i)
+	plaq[i] += gu[mu].plaq[i];
+
+    double vinv = 1./L/L/L/T; // inverse volume    
+
+    for( int i = 0; i < plaq.size(); ++i)
+      plaq[i] = plaq[i]*vinv/72.0;
+    io::write_file(plaq,  "plaquette.bindat");
     ////////////////////////////////////////////////////////
     //
     //  zero mode subtraction
     std::vector<ZeroModeSubtractionKernel> z;
-    double vinv = 1./L/L/L/L; // inverse volume
+
     for (Direction mu; mu.is_good(); ++mu){
       gu[mu].reduce();
       z.push_back(ZeroModeSubtractionKernel(mu, gu[mu].M[0]*vinv));
     }
-    // for x_0 = 0 update the temporal direction only (as above)
     timings["Zero Mode Subtraction"].start();
-    U.apply_on_timeslice(z[0], 0);
-    // for x_0 != 0 update all directions (as above)
-    for (int t = 1; t < T; ++t)
+    // update all directions (as above)
+    for (int t = 0; t < T; ++t)
       for (Direction mu; mu.is_good(); ++mu)
         U.apply_on_timeslice(z[mu], t);
     timings["Zero Mode Subtraction"].stop();
@@ -293,9 +328,9 @@ int main(int argc, char *argv[]) {
     //  gauge fixing
     GaugeFixingKernel gf(alpha);
     timings["Gauge Fixing"].start();
-    for (int t = 1; t < T; ++t)
-      U.apply_on_timeslice(gf, t);
+    U.apply_everywhere(gf);
     timings["Gauge Fixing"].stop();
+
   } // end main for loop
   // write the gauge configuration
   if ( p["write"] != "none"){
