@@ -1,5 +1,5 @@
-#ifndef _MY_QCD_H_
-#define _MY_QCD_H_
+#ifndef _QCD_PT_H_
+#define _QCD_PT_H_
 
 #include <algorithm>
 #include <numeric>

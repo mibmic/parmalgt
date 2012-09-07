@@ -8,11 +8,11 @@
 #   o The order of the parameters does not matter
 #   o A hash sign is interpreted as a comment
 
-L 4             # Lattice extend, we set T = L in the simulation
+L 6             # Lattice extend, we set T = L in the simulation
 s 0             # s parameter for staggered
 alpha 0.05      # gauge fixing parameter
-taug 0.01       # integration step size
-NRUN 40         # number of configs to generate
+taug 0.03       # integration step size
+NRUN 100         # number of configs to generate
 MEAS_FREQ 10    # frequency of measurements
 seed 1234       # random number seed
 

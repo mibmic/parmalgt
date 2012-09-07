@@ -24,13 +24,6 @@ void kill_handler(int s){
        got_signal = s;
        std::cout << "INITIATE KILL SEQUENCE\n"; 
 }
-struct tri_coord{
-  int Nm1;
-  explicit tri_coord(int N) : Nm1(N-1) { }
-  int operator()(int i, int j){
-    return i * Nm1 - i * (i - 1) / 2 + j - i - 1;
-  }
-};
 
 // space-time dimensions
 const int DIM = 4;
@@ -52,7 +45,7 @@ int NRUN;
 // frequency of measurements
 int MEAS_FREQ;
 // testing gauge fixing option -- DO NOT TOUCH!
-const int GF_MODE = 1;
+const int GF_MODE = 3;
 // integration step and gauge fixing parameter
 double taug;
 double alpha;
@@ -74,8 +67,11 @@ typedef GluonField::neighbors_t nt;
 // Make aliases for the Kernels ...
 //
 
+// ... for the gauge action ...
+typedef kernels::StapleKernel< Bgf_t, ORD, DIM > StapleKernel_t;
+
 // ... for the gauge update/fixing ...
-typedef kernels::GaugeUpdateKernel<Bgf_t, ORD, DIM> GaugeUpdateKernel;
+typedef kernels::GaugeUpdateKernel<Bgf_t, ORD, DIM, StapleKernel_t> GaugeUpdateKernel;
 typedef kernels::ZeroModeSubtractionKernel<Bgf_t, ORD, DIM> ZeroModeSubtractionKernel;
 typedef kernels::GaugeFixingKernel<GF_MODE, Bgf_t, ORD, DIM> GaugeFixingKernel;
 
@@ -87,6 +83,7 @@ typedef kernels::PlaqLowerKernel<Bgf_t, ORD, DIM> PlaqLowerKernel;
 typedef kernels::PlaqUpperKernel<Bgf_t, ORD, DIM> PlaqUpperKernel;
 typedef kernels::PlaqSpatialKernel<Bgf_t, ORD, DIM> PlaqSpatialKernel;
 typedef kernels::MeasureNormKernel<Bgf_t, ORD, DIM> MeasureNormKernel;
+typedef kernels::PlaqKernel<Bgf_t, ORD, DIM> PlaqKernel;
 
 // ... and for the checkpointing.
 typedef kernels::FileWriterKernel<Bgf_t, ORD, DIM> FileWriterKernel;
@@ -103,7 +100,13 @@ void measure(GluonField &U){
   d_dC(0,0) = Cplx(0, 0);
   d_dC(1,1) = Cplx(0, 2./L);
   d_dC(2,2) = Cplx(0, -2./L);
-  
+  // NEW:
+  // In the first version, we forgot to take the chain rule into
+  // account. We have
+  //
+  //     d_eta exp(C) = [d_eta C] * C * exp(C)
+  //
+  // and hence we need C and C' as well to calculate d_eta S[U]
   double pio3 = std::atan(1.)*4./3.;
   SU3 C, Cp;
   C(0,0)  = Cplx(0, -pio3/L);
@@ -114,12 +117,6 @@ void measure(GluonField &U){
 
   // shorthand for V3
   int V3 = L*L*L;
-
-  // testing: Measure the spatial plaq at one time slice
-
-  PlaqSpatialKernel Pnew;
-  U.apply_on_slice_with_bnd(Pnew, Direction(0), 1);
-  io::write_file<ptSU3, ORD>(Pnew.val, Pnew.val.bgf().Tr(), "new_plaq.bindat");
 
   PlaqLowerKernel Pl; // Plaquettes U_{0,k} at t = 0
   PlaqUpperKernel Pu; // Plaquettes U_{0,k} at t = T - 1
@@ -163,6 +160,31 @@ void measure(GluonField &U){
   tmp = Ps.val / 3 / V3 / (T-1);
   tree = tmp.bgf().Tr();
   io::write_file<ptSU3, ORD>(tmp, tree, "ss_plaq.bindat");
+
+  PlaqKernel Pq;
+  for (int t = 0; t < T; ++t)
+    U.apply_everywhere(Ps);
+    //meas_on_timeslice(U, t, Ps);
+  tmp = Pq.val / (12.0 * V3*T);
+  tree = tmp.bgf().Tr();
+  io::write_file<ptSU3, ORD>(tmp, tree, "all_plaq.bindat");
+
+
+}
+
+
+// Our measurement
+void measure_plaquette(GluonField &U){
+
+  // shorthand for V3*T
+  int V = L*L*L*T;
+
+  PlaqKernel Pq;
+  U.apply_everywhere(Pq);
+  ptSU3 tmp = Pq.val / (18.0*V) ;
+  Cplx tree = tmp.bgf().Tr();
+  io::write_file<ptSU3, ORD>(tmp, tree, "all_plaq.bindat");
+
 }
 
 // timing
@@ -233,8 +255,8 @@ int main(int argc, char *argv[]) {
   //
   // random number generators
   srand(atoi(p["seed"].c_str()));
-  GaugeUpdateKernel::rands.resize(L*L*L*(T+1));
-  for (int i = 0; i < L*L*L*(T+1); ++i)
+  GaugeUpdateKernel::rands.resize(L*L*L*T);
+  for (int i = 0; i < L*L*L*T; ++i)
     GaugeUpdateKernel::rands[i].init(rand());
   ////////////////////////////////////////////////////////////////////
   //
@@ -243,8 +265,20 @@ int main(int argc, char *argv[]) {
   geometry::Geometry<DIM>::extents_t e;
   // we want a L = 4 lattice
   std::fill(e.begin(), e.end(), L);
-  // for SF boundary: set the time extend to T + 1
+  // Two differences between SF boundary conditions and periodic ones:
+  // A) We need to store the boundary links U_k(x) at x_0 = T in the
+  //    SF case, hence we will store L^(DIM-1) * (T+1) links.
+  // B) We want to apply the zero mode subtraction and the gauge
+  //    fixing at x_0 = 1 in the SF case.
+  // We take care of both here:
+#ifdef SF
   e[0] = T + 1;
+  int T_START = 1;
+#else
+  e[0] = T;
+  int T_START = 0;
+#endif
+  
   // we will have just one field
   GluonField U(e, 1, 0, nt());
   // initialize background field get method
@@ -261,6 +295,7 @@ int main(int argc, char *argv[]) {
     FileReaderKernel fr(p);
     U.apply_everywhere(fr);
   }
+
   ////////////////////////////////////////////////////////////////////
   //
   // start the simulation
@@ -269,12 +304,12 @@ int main(int argc, char *argv[]) {
       std::cout << i_;
       MeasureNormKernel m(ORD + 1);
       U.apply_everywhere(m);
-      for (int i = 0 ; i < m.norm.size(); ++i)
-        std::cout << " " << m.norm[i];
-      std::cout << "\n";
-      timings["measurements"].start();
-      measure(U);
-      timings["measurements"].stop();
+       for (int i = 0 ; i < m.norm.size(); ++i)
+         std::cout << " " << m.norm[i];
+       std::cout << "\n";
+       timings["measurements"].start();
+       measure(U);
+       timings["measurements"].stop();
     }
     ////////////////////////////////////////////////////////
     //
@@ -282,95 +317,56 @@ int main(int argc, char *argv[]) {
     std::vector<GaugeUpdateKernel> gu;
     for (Direction mu; mu.is_good(); ++mu)
       gu.push_back(GaugeUpdateKernel(mu, taug));
+
     timings["Gauge Update"].start();
+#ifdef SF // Schrödinger functional boundary conditions
     // for x_0 = 0 update the temporal direction only
     U.apply_on_timeslice(gu[0], 0);
-    // for x_0 != 0 update all directions
+#else // periodic bc
+    // update all directions for periodic BC
+    for (Direction mu; mu.is_good(); ++mu)
+      U.apply_on_timeslice(gu[mu], 0);
+#endif
     for (int t = 1; t < T; ++t)
       for (Direction mu; mu.is_good(); ++mu)
         U.apply_on_timeslice(gu[mu], t);
-
     timings["Gauge Update"].stop();
+
+    std::vector<Cplx> plaq(ORD+1);
+    for (Direction mu; mu.is_good(); ++mu)
+      for( int i = 0; i < gu[mu].plaq.size(); ++i)
+	plaq[i] += gu[mu].plaq[i];
+
+    double vinv = 1./L/L/L/T; // inverse volume    
+
+    for( int i = 0; i < plaq.size(); ++i)
+      plaq[i] = plaq[i]*vinv/72.0;
+    io::write_file(plaq,  "plaquette.bindat");
     ////////////////////////////////////////////////////////
     //
     //  zero mode subtraction
     std::vector<ZeroModeSubtractionKernel> z;
-    double vinv = 1./L/L/L/L; // inverse volume
+
     for (Direction mu; mu.is_good(); ++mu){
       gu[mu].reduce();
       z.push_back(ZeroModeSubtractionKernel(mu, gu[mu].M[0]*vinv));
     }
-    // for x_0 = 0 update the temporal direction only (as above)
     timings["Zero Mode Subtraction"].start();
-    U.apply_on_timeslice(z[0], 0);
-    // for x_0 != 0 update all directions (as above)
-    for (int t = 1; t < T; ++t)
+    // update all directions (as above)
+    for (int t = T_START; t < T; ++t)
       for (Direction mu; mu.is_good(); ++mu)
         U.apply_on_timeslice(z[mu], t);
     timings["Zero Mode Subtraction"].stop();
-    //////////////////////////////////////////////////////////////////////
-    //////////////////////////////////////////////////////////////////////
-    ///
-    ///  Double check the observables after gauge fixing
-    ///
-    ///  \author Dirk Hesse <herr.dirk.hesse@gmail.com>
-    ///  \date Tue Sep  4 15:52:47 2012
-     if (! (i_ % MEAS_FREQ) && false ) {
-      std::cout << i_;
-      MeasureNormKernel m(ORD + 1);
-      U.apply_everywhere(m);
-      for (int i = 0 ; i < m.norm.size(); ++i)
-        std::cout << " " << m.norm[i];
-      std::cout << "\n";
-      timings["measurements"].start();
-      measure(U);
-      timings["measurements"].stop();
-    }
-
 
     ////////////////////////////////////////////////////////
     //
     //  gauge fixing
 
-  // store all plaquettes
-  std::vector<std::vector<std::vector<Cplx> > > 
-    Plaqs(L*L*L*(T+1), 
-          std::vector<std::vector<Cplx> >(6, std::vector<Cplx>(ORD+1)));
-  tri_coord f(4);
-
-  for (Point n = U.g_begin(), e = U.g_end(); n != e; ++n)
-    for (Direction mu; mu.is_good(); ++mu)
-      for (Direction nu(mu + 1); nu.is_good(); ++nu)
-        Plaqs.at(n).at(f(mu,nu)) = 
-          (U[n][mu] * U[n+mu][nu] 
-           * dag(U[n+nu][mu]) * dag(U[n][nu])).trace();
-
     GaugeFixingKernel gf(alpha);
     timings["Gauge Fixing"].start();
-    for (int t = 1; t < T; ++t)
+    for (int t = T_START; t < T; ++t)
       U.apply_on_timeslice(gf, t);
     timings["Gauge Fixing"].stop();
-
-    for (Point n = U.g_begin(), e = U.g_end(); n != e; ++n)
-      for (Direction mu; mu.is_good(); ++mu)
-        for (Direction nu(mu + 1); nu.is_good(); ++nu){
-          std::vector<Cplx> Pnew =  (U[n][mu] * U[n+mu][nu] 
-                                     * dag(U[n+nu][mu]) 
-                                     * dag(U[n][nu])).trace();
-          for (int i = 0; i < ORD+1; ++i){
-            if ( fabs(Plaqs.at(n).at(f(mu,nu)).at(i).re - Pnew[i].re)
-                 > 1e-15 || 
-                 fabs(Plaqs.at(n).at(f(mu,nu)).at(i).im - Pnew[i].im)
-                 > 1e-15){
-              std::cout.precision(16);
-              std::cout << Plaqs.at(n).at(f(mu,nu)).at(i) << std::endl;
-              std::cout << Pnew[i] << std::endl;
-              std::cout << "at n = " << n << std::endl;
-              //throw std::exception();
-            }
-          }
-        }
-
 
   } // end main for loop
   // write the gauge configuration

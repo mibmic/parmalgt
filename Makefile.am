@@ -9,13 +9,16 @@ noinst_HEADERS = Background.h nspt.h MassC.h input.h MyTime.h \
 
 dist_data_DATA = input run.sh
 
-bin_PROGRAMS = LocalQuench
+bin_PROGRAMS = LocalQuench 
 
 #ParQuenched_SOURCES = ParQuenched.cc MyMath.cc MyRand.cc \
   newQCDpt.cc Point.cc Background.cc
 
 LocalQuench_SOURCES = LocalQuench.cc MyMath.cc MyRand.cc \
   newQCDpt.cc Point.cc Background.cc IO.cc
+
+#LocalUnquench_SOURCES = LocalUnquench.cc MyMath.cc MyRand.cc \
+#  newQCDpt.cc Point.cc Background.cc IO.cc
 
 .PHONY: docs
 

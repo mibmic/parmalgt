@@ -192,6 +192,10 @@ namespace fields {
                              rec_buffer[3].first);
     }
 #endif
+
+    pt::Point<DIM> begin() { return g.begin(); }
+    pt::Point<DIM> end()   { return g.end(); }
+
   private:
     geometry::Geometry<DIM> g;
     rep_t rep;

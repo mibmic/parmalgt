@@ -223,6 +223,13 @@ namespace io {
       to_bin_file(of, U[i].Tr());
     of.close();
   }
+
+  inline void write_file(const std::vector<Cplx> vec, const std::string& fname){
+    std::ofstream of(fname.c_str(), std::ios_base::app |  std::ios_base::binary);
+    for (int i = 0; i < vec.size(); ++i)
+      to_bin_file(of, vec[i]);
+    of.close();
+  }
   
   ////////////////////////////////////////////////////////////
   // formated cout for the timings/parameters

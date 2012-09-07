@@ -556,6 +556,7 @@ namespace bgf {
       a_ -= alpha.a_;
       return *this;
     }
+
     template<class C>
     ScalarBgf operator+ (const C& alpha ) const {
       ScalarBgf result(*this);
@@ -800,6 +801,11 @@ namespace bgf {
   template <> inline AbelianBgf zero<AbelianBgf>() {
     three_vec_t alpha_v = {0, 0, 0};
     return AbelianBgf(alpha_v);
+  };
+
+  template <> inline ScalarBgf zero<ScalarBgf>() {
+    Cplx a(0,0);
+    return ScalarBgf(a);
   };
   
   inline AbelianBgf random(){

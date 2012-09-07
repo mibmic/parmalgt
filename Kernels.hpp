@@ -4,8 +4,13 @@
 #include <LocalField.hpp>
 #include <PtTypes.hpp>
 #include <newQCDpt.h>
+#include <newMyQCD.h>
+
 #include <IO.hpp>
 #include <uparam.hpp>
+
+#include <list>
+
 #ifdef _OPENMP
 #include <omp.h>
 #else
@@ -26,6 +31,39 @@ namespace kernels {
 
 namespace kernels {
   
+
+  template <class BGF, int ORD,int DIM>
+  struct StapleKernel {
+    typedef BGptSU3<BGF, ORD> ptSU3;
+    typedef ptt::PtMatrix<ORD> ptsu3;
+    typedef BGptGluon<BGF, ORD, DIM> ptGluon;
+    typedef pt::Point<DIM> Point;
+    typedef pt::Direction<DIM> Direction;
+    typedef fields::LocalField<ptGluon, DIM> GluonField;
+
+    Direction mu;
+    ptSU3 zero;
+    std::list<ptSU3> val;
+
+    StapleKernel(const Direction& nu) : mu(nu) { }
+
+    void operator()(GluonField& U, const Point& n) {
+
+      val.push_back(zero);
+      typename std::list<ptSU3>::iterator it = val.begin();
+      for(Direction nu; nu.is_good(); ++nu)
+        if(nu != mu)
+          (*it) += U[n + mu][nu] *  dag(U[n][nu] * U[n + nu][mu])
+            + dag(U[n-nu][mu] * U[n+mu-nu][nu]) * U[n - nu][nu];
+      // Close the staple
+      (*it) = U[n][mu] * (*it) ;
+      
+    }
+
+
+  };
+
+
   //////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////
   ///
@@ -38,7 +76,7 @@ namespace kernels {
   ///  \author Dirk Hesse <herr.dirk.hesse@gmail.com>
   ///  \date Thu May 24 17:47:43 2012
 
-  template <class BGF, int ORD,int DIM>
+  template <class BGF, int ORD,int DIM, class StapleK_t >
   struct GaugeUpdateKernel {
     typedef BGptSU3<BGF, ORD> ptSU3;
     typedef ptt::PtMatrix<ORD> ptsu3;
@@ -47,7 +85,6 @@ namespace kernels {
     typedef pt::Direction<DIM> Direction;
     typedef fields::LocalField<ptGluon, DIM> GluonField;
 
-   
     // for testing, c.f. below
     static std::vector<MyRand> rands;
     //static MyRand Rand;
@@ -56,20 +93,33 @@ namespace kernels {
     
     double taug, stau;
 
+    // on-the-fly plaquette measure
+    std::vector<Cplx> pp, plaq;
+
     GaugeUpdateKernel(const Direction& nu, const double& t) :
-      mu(nu), M(omp_get_max_threads()), taug(t), stau(sqrt(t)) { }
+      mu(nu), M(omp_get_max_threads()), taug(t/6.0), stau(sqrt(t)), plaq(ORD+1), pp(ORD+1)  { }
     
     void operator()(GluonField& U, const Point& n) {
-      ptSU3 W;
-      W.zero();
-      for(Direction nu; nu.is_good(); ++nu)
-        if(nu != mu)
-          W += U[n + mu][nu] *  dag(U[n][nu] * U[n + nu][mu])
-            + dag(U[n-nu][mu] * U[n+mu-nu][nu]) * U[n - nu][nu];
-      // Close the staple
-      W = U[n][mu] * W;
+      //      ptSU3 W;
+      // W.zero();
+      // for(Direction nu; nu.is_good(); ++nu)
+      //   if(nu != mu)
+      //     W += U[n + mu][nu] *  dag(U[n][nu] * U[n + nu][mu])
+      //       + dag(U[n-nu][mu] * U[n+mu-nu][nu]) * U[n - nu][nu];
+      // // Close the staple
+      // W = U[n][mu] * W;
+
+      static StapleK_t st(mu);
+
+      st(U,n);
+      for( typename std::list<ptSU3>::iterator it = st.val.begin(); it != st.val.end(); ++it )
+	pp = it->trace(); 
+
+      for( int i = 0; i < plaq.size(); ++i)
+        plaq[i] += pp[i];
+
       // DH Feb. 6, 2012
-      ptsu3 tmp  = W.reH() * -taug; // take to the algebra
+      ptsu3 tmp  = st.val.begin()->reH() * -taug; // take to the algebra
       //tmp[0] -= stau*SU3rand(Rand); // add noise
       // use this to check if the multithreaded version gives 
       // identical results to the single threaded one
@@ -85,9 +135,10 @@ namespace kernels {
         for (; j != M.end(); ++j)
           M[0] += *j;
     }
+    
   };
-  template <class C, int N, int M> std::vector<MyRand> 
-    kernels::GaugeUpdateKernel<C,N,M>::rands;
+  template <class C, int N, int M, class P> std::vector<MyRand> 
+  kernels::GaugeUpdateKernel<C,N,M,P>::rands;
 
 
   //////////////////////////////////////////////////////////////////////
@@ -129,8 +180,8 @@ private:
     ptSU3 omega;
     for (Direction mu; mu.is_good(); ++mu)
       omega += U[n][mu] - U[n - mu][mu];
-    
-    ptSU3 Omega = exp<BGF, ORD>(  alpha * omega.reH());
+
+    ptSU3 Omega = exp<BGF, ORD>( alpha * omega.reH());
     ptSU3 OmegaDag = exp<BGF, ORD>( -alpha * omega.reH());
     
     for (Direction mu; mu.is_good(); ++mu){
@@ -392,6 +443,39 @@ private:
     }
 };
 
+
+  //////////////////////////////////////////////////////////////////////
+  //////////////////////////////////////////////////////////////////////
+  ///
+  ///  Kernel to measure the average Plaquette.
+  ///
+  template <class BGF, int ORD,int DIM>
+  struct PlaqKernel {
+
+    typedef BGptSU3<BGF, ORD> ptSU3;
+    typedef ptt::PtMatrix<ORD> ptsu3;
+    typedef BGptGluon<BGF, ORD, DIM> ptGluon;
+    typedef pt::Point<DIM> Point;
+    typedef pt::Direction<DIM> Direction;
+    typedef fields::LocalField<ptGluon, DIM> GluonField;
+    ptSU3 val;
+    PlaqKernel () : val(bgf::zero<BGF>()) { }
+    void operator()(GluonField& U, const Point& n){
+
+      ptSU3 tmp(bgf::zero<BGF>());
+      for (Direction k(0); k.is_good(); ++k)
+        for (Direction t(k+1); t.is_good(); ++t)
+            tmp += U[n][k] * U[n + k][t] * 
+              dag( U[n +t][k] ) * dag( U[n][t] );
+      
+
+#pragma omp critical
+      val += tmp;
+    }
+
+};
+
+
   //////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////
   ///
@@ -445,7 +529,8 @@ private:
     }
     io::CheckedIn i;
   };
-
+  
+ 
 }
 
 #endif

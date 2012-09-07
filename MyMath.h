@@ -1119,6 +1119,8 @@ public:
   Cplx& operator[] (const int& i) { return whr[i]; };
   const Cplx& operator[] (const int& i) const { return whr[i]; };
 
+  static const int storage_size = 6;
+
   CVector (){};
 
   CVector (Cplx *vec) {
@@ -1371,6 +1373,8 @@ public:
 		whr[2].re * whr[2].re + whr[2].im * whr[2].im );
   }
   
+  double Norm() { return mod(); }
+
   void dag() { 
     whr[0].im = -whr[0].im ;
     whr[1].im = -whr[1].im ;
@@ -1395,6 +1399,14 @@ public:
         return false;
     return true;
   }
+
+
+  void randomize() {
+    static MyRand r(1235431);
+    for (int i = 0; i < 3; ++i)
+      whr[i] = Cplx(r.Rand(), r.Rand());
+  };
+
 }; // end class CVector
 
 
