@@ -552,15 +552,29 @@ namespace bgf {
       a_ -= alpha;
       return *this;
     }
+    ScalarBgf& operator-= (const ScalarBgf& alpha ){
+      a_ -= alpha.a_;
+      return *this;
+    }
     template<class C>
     ScalarBgf operator+ (const C& alpha ) const {
       ScalarBgf result(*this);
       return result += alpha;
     }
+    ScalarBgf operator+ (const ScalarBgf& alpha ) const {
+      ScalarBgf result(*this);
+      result.a_ += alpha.a_;
+      return result;
+    }
     template<class C>
     ScalarBgf operator- (const C& alpha ) const {
       ScalarBgf result(*this);
       return result -= alpha;
+    }
+    ScalarBgf operator- (const ScalarBgf& alpha ) const {
+      ScalarBgf result(*this);
+      result.a_ -= alpha.a_;
+      return result;
     }
     ScalarBgf inverse() const {
       ScalarBgf result;
@@ -568,7 +582,7 @@ namespace bgf {
       return result;
     }
     void set_to_one() { a_ = Cplx(1,0);};
-    void set_to_zero() { a_ = Cplx(1,0);};
+    void set_to_zero() { a_ = Cplx(0,0);};
     /// Trace
     Cplx Tr() const {
       return a_ * 3.;
