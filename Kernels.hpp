@@ -142,16 +142,7 @@ private:
     // exp version
     ptSU3 omega;
     for (Direction mu; mu.is_good(); ++mu)
-      {
-	omega += U[n][mu] - U[n - mu][mu];
-	if( (int) n== 0 ) 
-	  {
-	    std::cout << "\n";
-	    (U[n][mu])[1].prout();
-	    (U[n-mu][mu])[1].prout();
-	    std::cout << "\n";
-	  }
-      }
+      omega += U[n][mu] - U[n - mu][mu];
 
     ptSU3 Omega = exp<BGF, ORD>( alpha * omega.reH());
     ptSU3 OmegaDag = exp<BGF, ORD>( -alpha * omega.reH());
