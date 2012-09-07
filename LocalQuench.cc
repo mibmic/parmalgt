@@ -67,8 +67,11 @@ typedef GluonField::neighbors_t nt;
 // Make aliases for the Kernels ...
 //
 
+// ... for the gauge action ...
+typedef kernels::StapleKernel< Bgf_t, ORD, DIM > StapleKernel_t;
+
 // ... for the gauge update/fixing ...
-typedef kernels::GaugeUpdateKernel<Bgf_t, ORD, DIM> GaugeUpdateKernel;
+typedef kernels::GaugeUpdateKernel<Bgf_t, ORD, DIM, StapleKernel_t> GaugeUpdateKernel;
 typedef kernels::ZeroModeSubtractionKernel<Bgf_t, ORD, DIM> ZeroModeSubtractionKernel;
 typedef kernels::GaugeFixingKernel<GF_MODE, Bgf_t, ORD, DIM> GaugeFixingKernel;
 
