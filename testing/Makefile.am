@@ -18,7 +18,7 @@ lib_libgtest_main_la_LIBADD = lib/libgtest.la
 # moment
 
 bin_PROGRAMS = test_Geometry test_Bgfield test_Helper test_SU3 test_newQCDpt \
-	test_PtTypes #test_Point
+	test_PtTypes test_Field #test_Point
 
 test_Geometry_SOURCES = test_Geometry.cc
 test_Geometry_LDADD = lib/libgtest_main.la
@@ -40,6 +40,10 @@ test_newQCDpt_LDADD = lib/libgtest.la
 
 test_PtTypes_SOURCES = test_PtTypes.cc ../MyMath.cc ../MyRand.cc
 test_PtTypes_LDADD = lib/libgtest_main.la
+
+test_Field_SOURCES = test_Field.cc ../MyMath.cc ../MyRand.cc \
+	../newQCDpt.cc ../Background.cc
+test_Field_LDADD = lib/libgtest_main.la
 
 #test_Point_SOURCES = test_Point.cc
 #test_Point_LDADD = lib/libgtest_main.la

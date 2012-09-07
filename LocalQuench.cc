@@ -24,6 +24,13 @@ void kill_handler(int s){
        got_signal = s;
        std::cout << "INITIATE KILL SEQUENCE\n"; 
 }
+struct tri_coord{
+  int Nm1;
+  explicit tri_coord(int N) : Nm1(N-1) { }
+  int operator()(int i, int j){
+    return i * Nm1 - i * (i - 1) / 2 + j - i - 1;
+  }
+};
 
 // space-time dimensions
 const int DIM = 4;
@@ -51,7 +58,7 @@ double taug;
 double alpha;
 
 // some shorthands
-typedef bgf::ScalarBgf Bgf_t; // background field
+typedef bgf::AbelianBgf Bgf_t; // background field
 typedef BGptSU3<Bgf_t, ORD> ptSU3; // group variables
 typedef ptt::PtMatrix<ORD> ptsu3; // algebra variables
 typedef BGptGluon<Bgf_t, ORD, DIM> ptGluon; // gluon
@@ -96,29 +103,43 @@ void measure(GluonField &U){
   d_dC(0,0) = Cplx(0, 0);
   d_dC(1,1) = Cplx(0, 2./L);
   d_dC(2,2) = Cplx(0, -2./L);
+  
+  double pio3 = std::atan(1.)*4./3.;
+  SU3 C, Cp;
+  C(0,0)  = Cplx(0, -pio3/L);
+  C(2,2)  = Cplx(0, pio3/L);
+  Cp(0,0) = Cplx(0, -3.*pio3/L);
+  Cp(1,1) = Cplx(0, 2.*pio3/L);
+  Cp(2,2) = Cplx(0, pio3/L);
 
   // shorthand for V3
   int V3 = L*L*L;
+
+  // testing: Measure the spatial plaq at one time slice
+
+  PlaqSpatialKernel Pnew;
+  U.apply_on_slice_with_bnd(Pnew, Direction(0), 1);
+  io::write_file<ptSU3, ORD>(Pnew.val, Pnew.val.bgf().Tr(), "new_plaq.bindat");
 
   PlaqLowerKernel Pl; // Plaquettes U_{0,k} at t = 0
   PlaqUpperKernel Pu; // Plaquettes U_{0,k} at t = T - 1
   U.apply_on_slice_with_bnd(Pl, Direction(0), 0);
   U.apply_on_slice_with_bnd(Pu, Direction(0), T-1);
-  //meas_on_timeslice(U, 0, Pl);
-  //meas_on_timeslice(U, T - 1, Pu);
+
   PlaqUpperKernel Pm; // Plaquettes U_{0,k} at t = 1, ..., T - 2
   for (int t = 1; t < T - 1; ++t)
     U.apply_on_slice_with_bnd(Pm, Direction(0), t);
-    //meas_on_timeslice(U, t, Pm);
 
   PlaqSpatialKernel Ps; // Spatial plaq. at t = 1, ..., T-1
   for (int t = 1; t < T; ++t)
     U.apply_on_slice_with_bnd(Ps, Direction(0), t);
-    //meas_on_timeslice(U, t, Ps);
 
   // Evaluate Gamma'
-  ptSU3 tmp = Pl.val + Pu.val;
-  std::for_each(tmp.begin(), tmp.end(), pta::mul(dC));
+  //ptSU3 tmp = Pl.val + Pu.val;
+  ptSU3 t1 = Pl.val, t2 = Pu.val;
+  std::for_each(t1.begin(), t1.end(), pta::mul(dC*C));
+  std::for_each(t2.begin(), t2.end(), pta::mul(dag(Cp)*dC));
+  ptSU3 tmp = t1 + t2;
   Cplx tree = tmp.bgf().ApplyFromLeft(dC).Tr();
   io::write_file<ptSU3, ORD>(tmp, tree, "Gp.bindat");
 
@@ -287,15 +308,70 @@ int main(int argc, char *argv[]) {
       for (Direction mu; mu.is_good(); ++mu)
         U.apply_on_timeslice(z[mu], t);
     timings["Zero Mode Subtraction"].stop();
+    //////////////////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////
+    ///
+    ///  Double check the observables after gauge fixing
+    ///
+    ///  \author Dirk Hesse <herr.dirk.hesse@gmail.com>
+    ///  \date Tue Sep  4 15:52:47 2012
+     if (! (i_ % MEAS_FREQ) && false ) {
+      std::cout << i_;
+      MeasureNormKernel m(ORD + 1);
+      U.apply_everywhere(m);
+      for (int i = 0 ; i < m.norm.size(); ++i)
+        std::cout << " " << m.norm[i];
+      std::cout << "\n";
+      timings["measurements"].start();
+      measure(U);
+      timings["measurements"].stop();
+    }
+
 
     ////////////////////////////////////////////////////////
     //
     //  gauge fixing
+
+  // store all plaquettes
+  std::vector<std::vector<std::vector<Cplx> > > 
+    Plaqs(L*L*L*(T+1), 
+          std::vector<std::vector<Cplx> >(6, std::vector<Cplx>(ORD+1)));
+  tri_coord f(4);
+
+  for (Point n = U.g_begin(), e = U.g_end(); n != e; ++n)
+    for (Direction mu; mu.is_good(); ++mu)
+      for (Direction nu(mu + 1); nu.is_good(); ++nu)
+        Plaqs.at(n).at(f(mu,nu)) = 
+          (U[n][mu] * U[n+mu][nu] 
+           * dag(U[n+nu][mu]) * dag(U[n][nu])).trace();
+
     GaugeFixingKernel gf(alpha);
     timings["Gauge Fixing"].start();
     for (int t = 1; t < T; ++t)
       U.apply_on_timeslice(gf, t);
     timings["Gauge Fixing"].stop();
+
+    for (Point n = U.g_begin(), e = U.g_end(); n != e; ++n)
+      for (Direction mu; mu.is_good(); ++mu)
+        for (Direction nu(mu + 1); nu.is_good(); ++nu){
+          std::vector<Cplx> Pnew =  (U[n][mu] * U[n+mu][nu] 
+                                     * dag(U[n+nu][mu]) 
+                                     * dag(U[n][nu])).trace();
+          for (int i = 0; i < ORD+1; ++i){
+            if ( fabs(Plaqs.at(n).at(f(mu,nu)).at(i).re - Pnew[i].re)
+                 > 1e-15 || 
+                 fabs(Plaqs.at(n).at(f(mu,nu)).at(i).im - Pnew[i].im)
+                 > 1e-15){
+              std::cout.precision(16);
+              std::cout << Plaqs.at(n).at(f(mu,nu)).at(i) << std::endl;
+              std::cout << Pnew[i] << std::endl;
+              std::cout << "at n = " << n << std::endl;
+              //throw std::exception();
+            }
+          }
+        }
+
+
   } // end main for loop
   // write the gauge configuration
   if ( p["write"] != "none"){

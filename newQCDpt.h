@@ -367,8 +367,13 @@ private:
   }
 };
 
-
-
+template <class B, int ORD>
+std::ostream& operator<<(std::ostream& os, const BGptSU3<B, ORD> &U){
+  os << "Trivial Order:\n";
+  os << U.bgf() << "\n";
+  os << U.ptU();
+  return os;
+}
 
 template <class B, int ORD>
 inline BGptSU3<B, ORD> 

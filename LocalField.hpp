@@ -87,14 +87,24 @@ namespace fields {
     }
     
     data_t& operator[](const pt::Point<DIM> &n){
+#ifdef DEBUG
+      try {
+        return rep.at((int)n);
+      }
+      catch(...){
+        std::cout << "Too high index: " << (int)n << std::endl;
+        throw;
+      }
+#else
       return n.template deref<data_t>(rep);
+#endif
     }
     const data_t& operator[](const pt::Point<DIM> &n) const {
       return n.template deref<const data_t>(rep);
     }
     
     pt::Point<DIM> mk_point(const typename geometry::Geometry<DIM>::raw_pt_t& n){
-      g.mk_point(n);
+      return g.mk_point(n);
     }
     geometry::SliceIterator<DIM, 0> mk_slice_iterator 
     (const pt::Direction<DIM> mu, const int& xi){
@@ -159,6 +169,9 @@ namespace fields {
       for(pt::Point<DIM> n = g.begin(), e = g.end(); n != e; ++n)
         f(*this, n);
     }
+
+    pt::Point<DIM> g_begin() { return g.begin(); }
+    pt::Point<DIM> g_end() { return g.end(); }
 #ifdef MPI
     MPI_Request test_send_fwd_z(){
       write_slice_to_buffer(pt::Direction<DIM>(3), 4,

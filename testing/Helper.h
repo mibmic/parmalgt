@@ -49,4 +49,21 @@ struct SU3Cmp {
   }
   const SU3 &a, &b;
 };
+
+struct CNear {
+  double eps;
+  explicit CNear(const double& e = 
+                 std::numeric_limits<double>::epsilon()*3) :
+    eps(e) { }
+  ::testing::AssertionResult operator()(const Cplx& a, const Cplx& b){
+    if (fabs(a.re - b.re) > eps ||
+        fabs(a.im - b.im) > eps )
+      return ::testing::AssertionFailure() 
+        << "(" << a.re << "," << a.im <<  ") vs. (" 
+        << b.re << "," << b.im <<  ")\n";
+    else 
+      return ::testing::AssertionSuccess();
+  }
+};
+
 #endif

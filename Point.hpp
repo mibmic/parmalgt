@@ -61,7 +61,6 @@ namespace pt {
       return *this;
     }
     Point& operator-=(const Direction<DIM>& mu){
-      
       n = mu.template deref_bkw<const int&,
                                 const arr_t&>(*(L_begin +n));
       return *this;

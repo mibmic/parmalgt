@@ -163,9 +163,10 @@ private:
     }
     ptSU3 Omega = exp<BGF, ORD>( -alpha * omega.reH());
     ptSU3 OmegaDag = exp<BGF, ORD>( alpha * omega.reH());
+
     for (Direction mu; mu.is_good(); ++mu){
       U[n][mu] = Omega * U[n][mu];
-      U[n - mu][mu] *= OmegaDag;
+      U[n - mu][mu] = U[n-mu][mu] * OmegaDag;
     }
   }
 };
@@ -247,7 +248,28 @@ private:
     explicit SetBgfKernel(const int& )  { }
     void operator()(GluonField& , const Point& ) const { }
   };
-  
+  //////////////////////////////////////////////////////////////////////
+  //////////////////////////////////////////////////////////////////////
+  ///
+  ///  Kernel to randomize
+  ///
+  ///  \author Dirk Hesse <herr.dirk.hesse@gmail.com>
+  ///  \date Wed Sep  5 15:09:47 2012
+  template <class BGF, int ORD,int DIM>
+  struct RandomizeKernel {
+
+    typedef BGptSU3<BGF, ORD> ptSU3;
+    typedef ptt::PtMatrix<ORD> ptsu3;
+    typedef BGptGluon<BGF, ORD, DIM> ptGluon;
+    typedef pt::Point<DIM> Point;
+    typedef pt::Direction<DIM> Direction;
+    typedef fields::LocalField<ptGluon, DIM> GluonField;
+
+    void operator()(GluonField& U, const Point& n) const {
+      for (Direction mu; mu.is_good(); ++mu)
+        U[n][mu].randomize();
+    }
+  };
   //////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////
   ///
@@ -298,7 +320,7 @@ private:
       Direction t(0);
       ptSU3 tmp(bgf::zero<BGF>());
       for (Direction k(1); k.is_good(); ++k)
-        tmp += U[n][k].bgf() * U[n + k][t] * 
+        tmp += U[n][k] * U[n + k][t] * 
           dag( U[n +t][k] ) * dag( U[n][t] );
 #pragma omp critical
       val += tmp;
@@ -333,7 +355,7 @@ private:
     Direction t(0);
     ptSU3 tmp(bgf::zero<BGF>());
     for (Direction k(1); k.is_good(); ++k)
-      tmp += dag( U [n + t][k].bgf() ) * dag( U[n][t] ) *
+      tmp += dag( U [n + t][k] ) * dag( U[n][t] ) *
               U[n][k] * U[n + k][t];
 #pragma omp cirtical
     val += tmp;

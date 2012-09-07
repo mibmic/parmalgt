@@ -83,23 +83,6 @@ namespace geometry {
       return SliceIterator<DIM, N>(mk_point(n), mu, extents);
     }
     
-    /// Generate an iterator over a given slice, omitting the boundaries.
-    /// The SliceIterator returned will ierate all lattice points
-    /// \f$n\f$, keeping \f$n_\mu = x_i\f$ fixed.
-    /// For all other directions, the iteration range is
-    /// \f[ 1 \leq x_\nu < L_\nu - 1, \quad \nu = 0,\ldots, DIM - 1, \quad  \nu \neq \mu\f]
-    ///
-    ///
-    /// \param mu Called \f$\mu\f$ above.
-    /// \param xi Called \f$n_i\f$ above.
-    template <int N>
-    SliceIterator<DIM, 2> mk_vol_iterator (const pt::Direction<DIM> mu,
-                                          const int& xi){
-      raw_pt_t n;
-      std::fill(n.begin(), n.end(), 1);
-      n[mu] = xi;
-      
-    }
     pt::Point<DIM> mk_point(const raw_pt_t &n) const {
       return pt::Point<DIM>(mk_label(n), neighbors.begin());
     }

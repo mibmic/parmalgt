@@ -149,7 +149,7 @@ inline bool operator!=(double, Cplx);
 
 
 inline std::ostream& operator<<(std::ostream& os, const Cplx& c){
-  os << c.re << c.im;
+  os << "(" << c.re << "," << c.im << ")";
   return os;
 }
 
@@ -1090,6 +1090,15 @@ public:
 
   friend SU3 exp(const SU3& A);
 };
+
+inline std::ostream& operator <<(std::ostream& os, const SU3& U){
+  for(int i = 0; i < 9; i++){
+    if(i%3 == 0)    os << std::endl;
+    os << " ";
+    os << U.whr[i];
+  }
+  os << std::endl;
+}
 
 Cplx Tr(const SU3& A);
 

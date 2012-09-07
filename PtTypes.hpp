@@ -219,6 +219,16 @@ namespace ptt {
     }
   };
 
+  template <int N> 
+  std::ostream& operator<<(std::ostream& os, const PtMatrix<N> &A){
+    typename PtMatrix<N>::const_iterator i;
+    int g = 1;
+    for (i = A.begin(); i != A.end(); ++i, ++g)
+      os << "order g^" << g << "\n" << *i;
+    return os;
+  }
+  
+
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 ///
