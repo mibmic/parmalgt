@@ -68,7 +68,7 @@ typedef GluonField::neighbors_t nt;
 //
 
 // ... for the gauge action ...
-typedef kernels::StapleKernel< Bgf_t, ORD, DIM > StapleKernel_t;
+typedef kernels::StapleReKernel< Bgf_t, ORD, DIM> StapleKernel_t;
 
 // ... for the gauge update/fixing ...
 typedef kernels::GaugeUpdateKernel<Bgf_t, ORD, DIM, StapleKernel_t> GaugeUpdateKernel;
@@ -270,6 +270,9 @@ int main(int argc, char *argv[]) {
     U.apply_everywhere(fr);
   }
 
+  
+  StapleKernel_t::weights[0] = -1./12.;
+
   ////////////////////////////////////////////////////////////////////
   //
   // start the simulation
@@ -300,6 +303,7 @@ int main(int argc, char *argv[]) {
 
     timings["Gauge Update"].stop();
 
+    // measure_plaquette(U);
     std::vector<Cplx> plaq(ORD+1);
     for (Direction mu; mu.is_good(); ++mu)
       for( int i = 0; i < gu[mu].plaq.size(); ++i)
