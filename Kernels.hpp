@@ -153,6 +153,7 @@ namespace kernels {
     typedef pt::Point<DIM> Point;
     typedef pt::Direction<DIM> Direction;
     typedef fields::LocalField<ptGluon, DIM> GluonField;
+    typedef std::vector<Cplx>::iterator cpx_vec_it;
 
     // for testing, c.f. below
     static std::vector<MyRand> rands;
@@ -163,10 +164,10 @@ namespace kernels {
     double taug, stau;
 
     // on-the-fly plaquette measure
-    std::vector<Cplx> pp, plaq;
+    std::vector<Cplx> plaq, pp;
 
     GaugeUpdateKernel(const Direction& nu, const double& t) :
-      mu(nu), M(omp_get_max_threads()), taug(t/6.0), stau(sqrt(t)), plaq(ORD+1), pp(ORD+1)  { }
+      mu(nu), M(omp_get_max_threads()), taug(t/6.0), stau(sqrt(t)), plaq(ORD+1), pp(ORD+1) { }
     
     void operator()(GluonField& U, const Point& n) {
       ptSU3 W;
@@ -174,9 +175,12 @@ namespace kernels {
       // We wants this static, but it fails ... field grows bigger and bigger ...
       StapleK_t st(mu);
       st(U,n);
-      // for( int i = 0; i < st.val.size(); ++i )
-      pp = (st.val[0].trace()); 
-      //      W = st.reduce();
+      pp = (st.val[0].trace());
+
+      for(cpx_vec_it k = plaq.begin(), j = pp.begin(); k != plaq.end(); ++k, ++j) *k += *j;
+      // for( int i = 0; i < pp.size(); ++i )
+      // 	plaq[i] += pp[i];
+
       ptsu3 tmp  = st.reduce().reH() * -taug;
 
       // DH Feb. 6, 2012
@@ -195,6 +199,7 @@ namespace kernels {
       if (++j != M.end())
         for (; j != M.end(); ++j)
           M[0] += *j;
+      for(cpx_vec_it k = plaq.begin(); k != plaq.end(); ++k) *k = 0.0;
     }
     
   };

@@ -57,6 +57,8 @@ typedef ptt::PtMatrix<ORD> ptsu3; // algebra variables
 typedef BGptGluon<Bgf_t, ORD, DIM> ptGluon; // gluon
 typedef pt::Point<DIM> Point;
 typedef pt::Direction<DIM> Direction;
+typedef std::vector<Cplx>::iterator cpx_vec_it;
+
 
 // shorthand for gluon field
 typedef fields::LocalField<ptGluon, DIM> GluonField;
@@ -303,16 +305,18 @@ int main(int argc, char *argv[]) {
 
     timings["Gauge Update"].stop();
 
-    // measure_plaquette(U);
+    //    measure_plaquette(U);
     std::vector<Cplx> plaq(ORD+1);
     for (Direction mu; mu.is_good(); ++mu)
-      for( int i = 0; i < gu[mu].plaq.size(); ++i)
-	plaq[i] += gu[mu].plaq[i];
+      for( cpx_vec_it k = plaq.begin(), j = gu[mu].plaq.begin(); k != plaq.end(); ++k, ++j) *k += *j;
+      // for( int i = 0; i < gu[mu].plaq.size(); ++i)
+      // 	plaq[i] += gu[mu].plaq[i];
 
     double vinv = 1./L/L/L/T; // inverse volume    
 
-    for( int i = 0; i < plaq.size(); ++i)
-      plaq[i] = plaq[i]*vinv/72.0;
+    for( cpx_vec_it k = plaq.begin(); k != plaq.end(); ++k) *k *= vinv/72.0;
+    // for( int i = 0; i < plaq.size(); ++i)
+    //   plaq[i] = plaq[i]*vinv/72.0;
     io::write_file(plaq,  "plaquette.bindat");
     ////////////////////////////////////////////////////////
     //
