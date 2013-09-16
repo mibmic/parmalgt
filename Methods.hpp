@@ -181,6 +181,56 @@ namespace meth{
 	for (Direction mu; mu.is_good(); ++mu)
 	  U.apply_on_timeslice(wf[mu], t);
     }
+
+    // workaround for template typedef
+    // for improved wilson flow
+    template <class GluonField, class StK, class PR> struct WFK {
+      typedef  kernels::WilFlowKernel <GluonField, StK, PR> type;
+    };
+    
+    ////////////////////////////////////////////////////////////
+    //
+    // Wilson flow using an improved gauge action.
+    //
+    // \author Dirk Hesse <herr.dirk.hesse@gmail.com>
+    // \date Mon Sep 16 14:48:44 2013
+    template <class GluonField>
+    void euler_flow_improved(GluonField& U, const double& eps){
+      typedef kernels::StapleReKernel<GluonField> StK;
+      int T = U.extent(0) - 1;
+      // we need these to implement the imrovement at the boundary
+      // NOTE however, that they have to be applied at t=1 and T=t-1
+      typedef kernels::LWProcessA<GluonField> PrAK;
+      typedef kernels::LWProcessB<GluonField> PrBK;
+      typedef kernels::TrivialPreProcess<GluonField> PrTK;
+      // In the case of an improved gauge action, we proceed with the
+      // update according to choice "B" in Aoki et al., hep-lat/9808007
+      // make vector of 'tirvially' pre-processed gauge update kernels
+      std::vector<typename WFK<GluonField, StK, PrTK>::type> wft;
+      // extract direction type
+      static const int n_dim = GluonField::dim;
+      //typedef pt::Point<n_dim> Point_t;
+      typedef pt::Direction<n_dim> Direction;
+      for (Direction mu; mu.is_good(); ++mu)
+	wft.push_back(typename WFK<GluonField, StK, PrTK>::type(mu, eps));
+      // 1) Use 'special' GU kernels for spatial plaquettes at t=1 and
+      //    T-1, re reason for this is that the rectangular plaquettes
+      //    with two links on the boundary have a weight of 3/2 c_1.
+      for (Direction k(1); k.is_good(); ++k){
+	typename WFK<GluonField, StK, PrAK>::type wfa (k, eps);
+	typename WFK<GluonField, StK, PrBK>::type wfb (k, eps);
+	U.apply_on_timeslice(wfa, 1);
+	U.apply_on_timeslice(wfb, T-1);
+      }
+      // 2) Business as usual for t = 2,...,T-2, all directions and 
+      //    t = 0,1 and T-1 for mu = 0
+      for (int t = 2; t <= T-2; ++t)
+	for (Direction mu; mu.is_good(); ++mu)
+	  U.apply_on_timeslice(wft[mu], t);
+      U.apply_on_timeslice(wft[0], 0);
+      U.apply_on_timeslice(wft[0], 1);
+      U.apply_on_timeslice(wft[0], T-1);
+    }
   }
 
   namespace gu {

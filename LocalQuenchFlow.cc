@@ -251,7 +251,7 @@ int main(int argc, char *argv[]) {
     //  gauge update
     ////
     timings["Gauge Update"].start();
-    meth::gu::RK2_update(U, taug);
+    meth::gu::RK2_update<GluonField, false>(U, taug);
     timings["Gauge Update"].stop();
     ////////////////////////////////////////////////////////
     //
@@ -279,7 +279,9 @@ int main(int argc, char *argv[]) {
       // ... prepare Kernels
       for (int j_ = 1; j_ <= NFLOW && !soft_kill; ++j_){
         timings["Wilson flow"].start();
-	meth::wflow::RK2_flow(Up, tauf);
+	//meth::wflow::RK2_flow(Up, tauf);
+	// OR:
+	meth::wflow::euler_flow_improved(Up, tauf);
 	timings["Wilson flow"].stop();
 	if ( ! (j_ % FLOW_MEAS_FREQ) ){
 	  timings["measurements"].start();
