@@ -92,6 +92,13 @@ void measure_common(GluonField &U, const std::string& rep_str){
   U.apply_on_timeslice(pt, L/2).reduce();
   io::write_file(ps.result, "Es_p.bindat");
   io::write_file(pt.result, "Em_p.bindat");
+  const double c1 = -1./12;
+  plaq::ImprovedSpatial<GluonField> psi(1. - 8*c1, c1);
+  plaq::ImprovedTemporal<GluonField> pti(1. - 8*c1, c1);
+  U.apply_on_timeslice(psi, L/2).reduce();
+  U.apply_on_timeslice(pti, L/2).reduce();
+  io::write_file(psi.result, "Es_pi.bindat");
+  io::write_file(pti.result, "Em_pi.bindat");
 }
 
 // Stuff that makes sense only for an Abelian background field.
