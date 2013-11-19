@@ -422,5 +422,46 @@ namespace kernels {
         U[n][mu] = exp<BGF, ORD>(tmp)*U[n][mu]; // back to SU3
       }
     };
+    
+    ////////////////////////////////////////////////////////////
+    //
+    // RK-1 gauge update with possibility for pre- and
+    // post-processing. This feature is needed for improved actions to
+    // have the possibility to adjust the plaquettes' weights at the
+    // boundary without a milion ifs.
+    //
+    // \author Dirk Hesse <herr.dirk.hesse@gmail.com>
+    // \date Tue Nov 19 11:40:57 2013
+
+    template <class Field_t, class StapleK_t, class RF_t, class Process>
+    struct GU_RK1_PROC {
+      
+      // collect info about the field
+      FLD_INFO(Field_t);
+      
+      // checker board hyper cube size
+      // c.f. geometry and localfield for more info
+      static const int n_cb = StapleK_t::n_cb;    
+      
+      Direction mu;
+      double taug;
+      double staug;
+      RF_t *R;
+      
+      GU_RK1_PROC(const Direction& nu, const double& t, RF_t &RR) :
+        mu(nu), taug(t), staug(std::sqrt(t)), R(&RR) { }
+  
+      void operator()(Field_t& U, const Point& n) {
+        // Make a Kernel to calculate and store the plaquette(s)
+        StapleK_t st(mu); // maye make a vector of this a class member
+        Process::pre_process(U,n,mu);
+        st(U,n);
+        Process::post_process(U,n,mu);
+	ptsu3 tmp  = st.reduce().reH() * -taug;
+	tmp[0] -= (*R)[n] * staug;
+        U[n][mu] = exp<BGF, ORD>(tmp)*U[n][mu]; // back to SU3
+      }
+    };
+
   } // end namespace gauge_update
 }

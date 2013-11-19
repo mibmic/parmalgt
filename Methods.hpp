@@ -197,6 +197,9 @@ namespace meth{
     template <class GluonField>
     void euler_flow_improved(GluonField& U, const double& eps){
       typedef kernels::StapleReKernel<GluonField> StK;
+      const double c_1 = -1./12;
+      StK::weights[0] = 1. - 8.*c_1;
+      StK::weights[1] = c_1;
       int T = U.extent(0) - 1;
       // we need these to implement the imrovement at the boundary
       // NOTE however, that they have to be applied at t=1 and T=t-1
@@ -494,6 +497,59 @@ namespace meth{
 	for (Direction mu; mu.is_good(); ++mu)
 	  U.apply_on_timeslice(wf1[mu], t);
     }
+
+    // workaround for template typedef
+    // for improved wilson flow
+    template <class GluonField, class StK,
+              class RandField, class PR> struct GUK {
+      typedef  kernels::gauge_update::GU_RK1_PROC <GluonField, StK, RandField ,PR> type;
+    };
+
+    template <class GluonField>
+    void RK1_update_improved(GluonField& U, const double& eps){
+      typedef typename detail::rand_gen_<GluonField>::RandField RK_t;
+      static detail::rand_gen_<GluonField> R(U);
+      R.update();
+      typedef kernels::StapleReKernel<GluonField> StK;
+      const double c_1 = -1./12;
+      StK::weights[0] = 1. - 8.*c_1;
+      StK::weights[1] = c_1;
+      int T = U.extent(0) - 1;
+      // we need these to implement the imrovement at the boundary
+      // NOTE however, that they have to be applied at t=1 and T=t-1
+      typedef kernels::LWProcessA<GluonField> PrAK;
+      typedef kernels::LWProcessB<GluonField> PrBK;
+      typedef kernels::TrivialPreProcess<GluonField> PrTK;
+      // In the case of an improved gauge action, we proceed with the
+      // update according to choice "B" in Aoki et al., hep-lat/9808007
+      // make vector of 'tirvially' pre-processed gauge update kernels
+      std::vector<typename GUK<GluonField, StK, RK_t, PrTK>::type> wft;
+      // extract direction type
+      static const int n_dim = GluonField::dim;
+      //typedef pt::Point<n_dim> Point_t;
+      typedef pt::Direction<n_dim> Direction;
+      for (Direction mu; mu.is_good(); ++mu)
+	wft.push_back(typename GUK<GluonField, StK, RK_t, PrTK>::type(mu, eps, R[mu]));
+      // 1) Use 'special' GU kernels for spatial plaquettes at t=1 and
+      //    T-1, re reason for this is that the rectangular plaquettes
+      //    with two links on the boundary have a weight of 3/2 c_1.
+      for (Direction k(1); k.is_good(); ++k){
+	typename GUK<GluonField, StK, RK_t, PrAK>::type wfa (k, eps, R[k]);
+	typename GUK<GluonField, StK, RK_t, PrBK>::type wfb (k, eps, R[k]);
+	U.apply_on_timeslice(wfa, 1);
+	U.apply_on_timeslice(wfb, T-1);
+      }
+      // 2) Business as usual for t = 2,...,T-2, all directions and 
+      //    t = 0,1 and T-1 for mu = 0
+      for (int t = 2; t <= T-2; ++t)
+	for (Direction mu; mu.is_good(); ++mu)
+	  U.apply_on_timeslice(wft[mu], t);
+      U.apply_on_timeslice(wft[0], 0);
+      U.apply_on_timeslice(wft[0], 1);
+      U.apply_on_timeslice(wft[0], T-1);
+    }
+
+
   }
 }
 

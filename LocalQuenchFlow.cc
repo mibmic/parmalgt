@@ -251,7 +251,9 @@ int main(int argc, char *argv[]) {
     //  gauge update
     ////
     timings["Gauge Update"].start();
-    meth::gu::RK2_update<GluonField, false>(U, taug);
+    //meth::gu::RK2_update<GluonField, false>(U, taug);
+    // OR: 
+    meth::gu::RK1_update_improved<GluonField>(U, taug);
     timings["Gauge Update"].stop();
     ////////////////////////////////////////////////////////
     //
@@ -282,6 +284,8 @@ int main(int argc, char *argv[]) {
 	//meth::wflow::RK2_flow(Up, tauf);
 	// OR:
 	meth::wflow::euler_flow_improved(Up, tauf);
+        // or, if you want an euler-update
+        // meth::wflow::RK1_flow(Up, tauf);
 	timings["Wilson flow"].stop();
 	if ( ! (j_ % FLOW_MEAS_FREQ) ){
 	  timings["measurements"].start();
