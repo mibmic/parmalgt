@@ -25,6 +25,11 @@
 #include <sstream>
 #endif
 
+#ifdef REPMODE
+#include <mpi.h>
+#include <sstream>
+#endif
+
 bool soft_kill = false;
 int got_signal = 100;
 void kill_handler(int s){
@@ -220,20 +225,33 @@ int main(int argc, char *argv[]) {
   // // initialize MPI communicator
   // comm::Communicator<GluonField>::init(argc,argv);
 
-  std::string rank_str = "";
+  ////////////////////////////////////////////////////////////
+  //
+  // If ran in replica mode (i.e. CXXFLAGS contains -DREPMODE) we need
+  // to write input and output with additional information on which
+  // MPI thread we are on.
+  //
+  // \author Dirk Hesse <herr.dirk.hesse@gmail.com>
+  // \date Fri Nov 22 13:01:28 2013
 
+#ifdef REPMODE
+  MPI_Init(&argc, &argv);
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  std::string rank_str = "." + to_string(rank);
+#else
+  std::string rank_str = "";
+#endif
   ////////////////////////////////////////////////////////////////////
   // read the parameters
   uparam::Param p;
-  //  p.read("input" + rank_str);
-  p.read("input");
+  p.read("input" + rank_str);
   // also write the number of space-time dimensions
   // and perturbative order to the parameters, to
   // make sure they are written in the .info file 
   // for the configurations stored on disk
   p.set("NDIM", to_string(DIM));
   p.set("ORD",  to_string(ORD));
-  std::ofstream of(("run.info"+rank_str).c_str(), std::ios::app);
+  std::ofstream of(("run.info" + rank_str).c_str(), std::ios::app);
   of << "INPUT PARAMETERS:\n";
   p.print(of);
   of.close();
