@@ -11,51 +11,9 @@ namespace meth{
   namespace gf {
 
     static const int GF_MODE = 1;
-    
-    namespace detail {
-      ////////////////////////////////////////////////////////////
-      //
-      //  Perform gauge fixing at t = 0. This is the corret method for
-      //  an Abelian background field.
-      //
-      //  \tparam    Fld_t The gluon field type.
-      //  \date      Thu Feb 21 18:27:43 2013
-      //  \author    Dirk Hesse <dirk.hesse@fis.unipr.it>
-      template <class Fld_t>
-      void bnd_gauge_fixing(Fld_t& U, const double& alpha, bgf::AbelianBgf){
-	typedef kernels::GFMeasKernel<Fld_t> GFMeasKernel;
-	typedef kernels::GFApplyKernel<Fld_t> GFApplyKernel;
-	int L = U.extent(1);
-	GFMeasKernel gfm;
-	U.apply_on_timeslice(gfm, 0);
-	GFApplyKernel gfa(gfm.val, alpha, L);
-	U.apply_on_timeslice(gfa, 0);
-      }
-      ////////////////////////////////////////////////////////////
-      //
-      //  Perform gauge fixing at t = 0. This is the corret method for
-      //  a trivial background field.
-      //
-      //  \tparam    Fld_t The gluon field type.
-      //  \date      Thu Feb 21 18:28:31 2013
-      //  \author    Dirk Hesse <dirk.hesse@fis.unipr.it>
-      template <class Fld_t>
-      void bnd_gauge_fixing(Fld_t& U, const double& alpha, bgf::ScalarBgf){
-	typedef kernels::GFMeasKernel<Fld_t> GFMeasKernel;
-	typedef kernels::GFApplyKernelTRBG<Fld_t> GFApplyKernel;
-	int L = U.extent(1);
-	GFMeasKernel gfm;
-	U.apply_on_timeslice(gfm, 0);
-	GFApplyKernel gfa(gfm.val, alpha, L);
-	U.apply_on_timeslice(gfa, 0);
-      }
-    }
     ////////////////////////////////////////////////////////////
     //
-    //  Perform the complete gauge fixing, at the boundary and in the
-    //  bulk. The correct method at the boundary (depending on if we
-    //  use a trivial or an Abelian background field is chosen
-    //  automatically.
+    //  Perform the complete gauge fixing
     //
     //  \param     U Gluon field.
     //  \param     alpha Gauge fixing parameter.
@@ -64,124 +22,37 @@ namespace meth{
     //  \date      Thu Feb 21 18:29:25 2013
     //  \author    Dirk Hesse <dirk.hesse@fis.unipr.it>
     template <class Fld_t>
-    void sf_gauge_fixing(Fld_t& U, const double& alpha){
+    void gauge_fixing(Fld_t& U, const double& alpha){
       typedef kernels::GaugeFixingKernel<GF_MODE, Fld_t> GaugeFixingKernel;
-      detail::bnd_gauge_fixing(U, alpha, typename kernels::std_types<Fld_t>::bgf_t());
-      int T = U.extent(0) - 1;
+      int T = U.extent(0);
       GaugeFixingKernel gf(alpha);
-      for (int t = 1; t < T; ++t)
+      for (int t = 0; t < T; ++t)
 	U.apply_on_timeslice(gf, t);
     }
   }
 
-  namespace wflow {
+  namespace zm {
+    
+    ////////////////////////////////////////////////////////////
+    //
+    //  Perform the subtraction of zero modes
+    //
+    //  \param     U Gluon field.
+    //  \tparam    Fld_t The gluon field type.
+    //
+    //  \date      
+    //  \author    
+    template <class Fld_t>
+    void subtract_zero(Fld_t& U,
+		       typename kernels::std_types<Fld_t>::direction_t& mu,
+		       typename kernels::std_types<Fld_t>::ptsu3_t& M){
+      kernels::ZeroModeSubtractionKernel<Fld_t> zero(U,mu,M);
+      U.apply_everywhere(zero);
+    }
 
-    ////////////////////////////////////////////////////////////
-    //
-    //  Third-order Runge-Kutta Wilson flow.
-    //
-    //  \bug       CURRENTLY DOES NOT WORK!!!
-    //  \param     U Gluon field.
-    //  \param     eps Integration steps size.
-    //  \tparam    Fld_t Gluon field type.
-    //
-    //  \date      Thu Feb 21 18:30:56 2013
-    //  \author    Dirk Hesse <dirk.hesse@fis.unipr.it>
-    template <class Fld_t>
-    void RK3_flow(Fld_t& U, const double& eps){
-      typedef typename kernels::flow::WF_RK_1<Fld_t, kernels::StapleSqKernel<Fld_t> > wf1_t;
-      typedef typename kernels::flow::WF_RK_2<Fld_t, kernels::StapleSqKernel<Fld_t> > wf2_t;
-      typedef typename kernels::flow::WF_RK_3<Fld_t, kernels::StapleSqKernel<Fld_t> > wf3_t;
-      typedef typename kernels::std_types<Fld_t>::direction_t Direction;
-      Fld_t F(U);
-      int T = U.extent(0) - 1;
-      std::vector<wf1_t> wf1;
-      for (Direction mu; mu.is_good(); ++mu)
-        wf1.push_back(wf1_t(mu, eps, F));
-      U.apply_on_timeslice(wf1[0], 0);
-      for (int t = 1; t < T; ++t)
-        for (Direction mu; mu.is_good(); ++mu)
-  	U.apply_on_timeslice(wf1[mu], t);
-      std::vector<wf2_t> wf2;
-      for (Direction mu; mu.is_good(); ++mu)
-        wf2.push_back(wf2_t(mu, eps, F));
-      U.apply_on_timeslice(wf2[0], 0);
-      for (int t = 1; t < T; ++t)
-  	for (Direction mu; mu.is_good(); ++mu)
-  	  U.apply_on_timeslice(wf2[mu], t);
-      std::vector<wf3_t> wf3;
-      for (Direction mu; mu.is_good(); ++mu)
-        wf3.push_back(wf3_t(mu, eps, F));
-      U.apply_on_timeslice(wf3[0], 0);
-      for (int t = 1; t < T; ++t)
-        for (Direction mu; mu.is_good(); ++mu)
-  	U.apply_on_timeslice(wf3[mu], t);
-    }
-    ////////////////////////////////////////////////////////////
-    //
-    //  Second-order Runge-Kutta Wilson flow.
-    //
-    //  \warning   Seems to work, but not thoroughly tested.
-    //  \param     U Gluon field.
-    //  \param     eps Integration steps size.
-    //  \tparam    Fld_t Gluon field type.
-    //
-    //  \date      Thu Feb 21 18:32:17 2013
-    //  \author    Dirk Hesse <dirk.hesse@fis.unipr.it>
-    template <class Fld_t>
-    void RK2_flow(Fld_t& U, const double& eps){
-      typedef typename kernels::flow::WF_RK2_1<Fld_t, kernels::StapleSqKernel<Fld_t> > wf1_t;
-      typedef typename kernels::flow::WF_RK2_2<Fld_t, kernels::StapleSqKernel<Fld_t> > wf2_t;
-      typedef typename kernels::std_types<Fld_t>::direction_t Direction;
-      Fld_t F(U), Util(U);
-      int T = U.extent(0) - 1;
-      std::vector<wf1_t> wf1;
-      for (Direction mu; mu.is_good(); ++mu)
-        wf1.push_back(wf1_t(mu, eps, F, Util));
-      U.apply_on_timeslice(wf1[0], 0);
-      for (int t = 1; t < T; ++t)
-        for (Direction mu; mu.is_good(); ++mu)
-  	U.apply_on_timeslice(wf1[mu], t);
-      std::vector<wf2_t> wf2;
-      for (Direction mu; mu.is_good(); ++mu)
-        wf2.push_back(wf2_t(mu, eps, F, Util));
-      U.apply_on_timeslice(wf2[0], 0);
-      for (int t = 1; t < T; ++t)
-        for (Direction mu; mu.is_good(); ++mu)
-  	U.apply_on_timeslice(wf2[mu], t);
-    }
-    ////////////////////////////////////////////////////////////
-    //
-    //  Wilson flow using an Euler scheme as the integrator. Seems to
-    //  work well when performing a simultaneous extrapolation to zero
-    //  step size of this method and the gauge update.
-    //
-    //  \param     U Gluon field.
-    //  \param     eps Integration steps size.
-    //  \tparam    Fld_t Gluon field type.
-    //
-    //  \date      Thu Feb 21 18:32:31 2013
-    //  \author    Dirk Hesse <dirk.hesse@fis.unipr.it>
-    template <class Fld_t>
-    void euler_flow(Fld_t& U, const double& eps){
+  }// namespace::zm
 
-      typedef kernels::StapleSqKernel<Fld_t> StK;
-      typedef kernels::TrivialPreProcess<Fld_t> PrK;
-      typedef kernels::WilFlowKernel <Fld_t, StK, PrK> WilFlowKernel;
-      typedef typename kernels::std_types<Fld_t>::direction_t Direction;
-      int T = U.extent(0) - 1;
-      StK::weights[0] = 1.;
-      std::vector<WilFlowKernel> wf;
-      for (Direction mu; mu.is_good(); ++mu)
-        wf.push_back(WilFlowKernel(mu, eps));
-      // for x_0 = 0 update the temporal direction only
-      U.apply_on_timeslice(wf[0], 0);
-      // for x_0 != 0 update all directions
-      for (int t = 1; t < T; ++t)
-	for (Direction mu; mu.is_good(); ++mu)
-	  U.apply_on_timeslice(wf[mu], t);
-    }
-  }
+
 
   namespace gu {
     namespace detail{ 
@@ -256,21 +127,15 @@ namespace meth{
 	std::vector<RandField> R;
 	int L, T;
 
-	rand_gen_(const Fld_t& U) : T(U.extent(0) - 1),
+	rand_gen_(const Fld_t& U) : T(U.extent(0)),
 				    L(U.extent(1)) {
 	  //*/
 	  // Using RANLUX
-	  long vol = (L*L*L*(T+1));
+	  long vol = (L*L*L*T);
 	  std::vector<int> seeds(vol);
 	  for (long i = 0; i < vol; ++i)
 	    seeds[i] = rand();
 	  RandKernel::rands = typename RandKernel::rand_vec_t(seeds.begin(), seeds.end());
-	  /*/
-	  // Using MyRand
-	  RandKernel::rands.resize(L*L*L*(T+1));
-	  for (int i = 0; i < L*L*L*(T+1); ++i)
-	    RandKernel::rands[i].init(rand());
-	  //*/
 	  for (int k = 0; k < DIM; ++k)
 	    R.push_back(RandField(U.extents(), 1, 0, nt()));
 	}
@@ -318,178 +183,83 @@ namespace meth{
     
     ////////////////////////////////////////////////////////////
     //
-    //  Perform a gauge update on the SF d.o.f. using a third-order
-    //  Runge-Kutta scheme.
-    //
-    //  \bug       DOES CURRENTLY NOT WORK!
-    //
-    //  \date      Thu Feb 21 18:26:15 2013
-    //  \author    Dirk Hesse <dirk.hesse@fis.unipr.it>
-    template <class Fld_t>
-    void RK3_update(Fld_t& U, const double& eps){
-      typedef typename detail::rand_gen_<Fld_t>::RandField RK_t;
-      typedef typename kernels::gauge_update::GU_RK_1<Fld_t, kernels::StapleSqKernel<Fld_t>, RK_t > wf1_t;
-      typedef typename kernels::gauge_update::GU_RK_2<Fld_t, kernels::StapleSqKernel<Fld_t>, RK_t > wf2_t;
-      typedef typename kernels::gauge_update::GU_RK_3<Fld_t, kernels::StapleSqKernel<Fld_t>, RK_t > wf3_t;
-      typedef typename kernels::std_types<Fld_t>::direction_t Direction;
-      static detail::rand_gen_<Fld_t> R(U);
-      R.update();
-      Fld_t F(U);
-      int T = U.extent(0) - 1;
-      std::vector<wf1_t> wf1;
-      for (Direction mu; mu.is_good(); ++mu)
-	wf1.push_back(wf1_t(mu, eps, F, R[mu]));
-      U.apply_on_timeslice(wf1[0], 0);
-      for (int t = 1; t < T; ++t)
-	for (Direction mu; mu.is_good(); ++mu)
-	  U.apply_on_timeslice(wf1[mu], t);
-      std::vector<wf2_t> wf2;
-      for (Direction mu; mu.is_good(); ++mu)
-	wf2.push_back(wf2_t(mu, eps, F, R[mu]));
-      U.apply_on_timeslice(wf2[0], 0);
-      for (int t = 1; t < T; ++t)
-	for (Direction mu; mu.is_good(); ++mu)
-	  U.apply_on_timeslice(wf2[mu], t);
-      std::vector<wf3_t> wf3;
-      for (Direction mu; mu.is_good(); ++mu)
-	wf3.push_back(wf3_t(mu, eps, F, R[mu]));
-      U.apply_on_timeslice(wf3[0], 0);
-      for (int t = 1; t < T; ++t)
-	for (Direction mu; mu.is_good(); ++mu)
-	  U.apply_on_timeslice(wf3[mu], t);
-    }
-
-    // select the correct kernel for the temporal boundary links
-    template <class Fld_t, bool b> struct bnd_kernel { // no ct
-      typedef typename detail::rand_gen_<Fld_t>::RandField RK_t;
-      typedef typename kernels::StapleSqKernel<Fld_t> Staple_k;
-      // kernels to be applied in temporal directions at x_0 = 0, x_0 = T - a
-      typedef typename kernels::gauge_update::GU_RK2_1<Fld_t, Staple_k, RK_t > wf1t_t;
-      typedef typename kernels::gauge_update::GU_RK2_2<Fld_t, Staple_k, RK_t > wf2t_t;
-      // kernels to be applided in spatial directions at x_0 = a, x_0 = T-a
-      typedef typename kernels::gauge_update::GU_RK2_1<Fld_t, Staple_k, RK_t > wf1s_early_t;
-      typedef typename kernels::gauge_update::GU_RK2_1<Fld_t, Staple_k, RK_t > wf1s_late_t;
-      typedef typename kernels::gauge_update::GU_RK2_2<Fld_t, Staple_k, RK_t > wf2s_early_t;
-      typedef typename kernels::gauge_update::GU_RK2_2<Fld_t, Staple_k, RK_t > wf2s_late_t;
-    };
-    template <class Fld_t> struct bnd_kernel<Fld_t, true> { // with ct
-      typedef typename detail::rand_gen_<Fld_t>::RandField RK_t;
-      // plaquette for temporal direction
-      typedef typename kernels::StapleSqKernelCtOneTemporal<Fld_t> CtStaple;
-      typedef typename kernels::StapleSqKernelCtOneSpatialEarly<Fld_t> CtEarlyStaple;
-      typedef typename kernels::StapleSqKernelCtOneSpatialLate<Fld_t> CtLateStaple;
-      // kernels to be applied in temporal directions at x_0 = 0, x_0 = T - a
-      typedef typename kernels::gauge_update::GU_RK2_1<Fld_t, CtStaple, RK_t > wf1t_t;
-      typedef typename kernels::gauge_update::GU_RK2_2<Fld_t, CtStaple, RK_t > wf2t_t;
-      // kernels to be applided in spatial directions at x_0 = a, x_0 = T-a
-      typedef typename kernels::gauge_update::GU_RK2_1<Fld_t, CtEarlyStaple, RK_t > wf1s_early_t;
-      typedef typename kernels::gauge_update::GU_RK2_1<Fld_t, CtLateStaple, RK_t > wf1s_late_t;
-      typedef typename kernels::gauge_update::GU_RK2_2<Fld_t, CtEarlyStaple, RK_t > wf2s_early_t;
-      typedef typename kernels::gauge_update::GU_RK2_2<Fld_t, CtLateStaple, RK_t > wf2s_late_t;
-    };
-
-
-    ////////////////////////////////////////////////////////////
-    //
-    //  Perform a gauge update on the SF d.o.f. using a second-order
+    //  Perform a gauge update using a second-order
     //  Runge-Kutta scheme.
     //
     //  \warning   Seems to work but is not very well tested.
     //
     //  \date      Thu Feb 21 18:27:23 2013
     //  \author    Dirk Hesse <dirk.hesse@fis.unipr.it>
-    template <class Fld_t, bool do_ct>
+    template <class Fld_t,class Staple_k>
     void RK2_update(Fld_t& U, const double& eps){
       typedef typename detail::rand_gen_<Fld_t>::RandField RK_t;
-      typedef typename kernels::StapleSqKernel<Fld_t> Staple_k;
       typedef typename kernels::gauge_update::GU_RK2_1<Fld_t, Staple_k, RK_t > wf1_t;
       typedef typename kernels::gauge_update::GU_RK2_2<Fld_t, Staple_k, RK_t > wf2_t;
       typedef typename kernels::std_types<Fld_t>::direction_t Direction;
       static detail::rand_gen_<Fld_t> R(U);
       R.update();
       Fld_t F(U), Util(U);
-      int T = U.extent(0) - 1;
+      int T = U.extent(0);
       ///////////////////////////////
       // FIRST STEP
       std::vector<wf1_t> wf1;
       for (Direction mu; mu.is_good(); ++mu)
 	wf1.push_back(wf1_t(mu, eps, F, R[mu], Util));
-      // t = 0, mu = 0
-      typename bnd_kernel<Fld_t, do_ct>::wf1t_t bndk1(Direction(0), eps, F, R[0], Util);
-      U.apply_on_timeslice(bndk1, 0);
-      // t = a, mu = 0
-      U.apply_on_timeslice(wf1[0], 1);
-      // t = a, mu = 1,2,..., D-1
-      for (Direction mu(1); mu.is_good(); ++mu){
-	typename bnd_kernel<Fld_t, do_ct>::wf1s_early_t tmp(mu, eps, F, R[mu], Util);
-	U.apply_on_timeslice(tmp, 1);
-      }
-      // t = 2*a, ..., T-2
-      for (int t = 2; t < T-1; ++t)
+      for (int t = 0; t < T; ++t)
 	for (Direction mu; mu.is_good(); ++mu)
 	  U.apply_on_timeslice(wf1[mu], t);
-      // t = T - 1, mu = 1,2,..., D-1
-      for (Direction mu(1); mu.is_good(); ++mu){
-	typename bnd_kernel<Fld_t, do_ct>::wf1s_late_t tmp(mu, eps, F, R[mu], Util);
-	U.apply_on_timeslice(tmp, T-1);
-      }
-      // t = T - 1, mu = 0
-      U.apply_on_timeslice(bndk1, T-1);
+
       ///////////////////////////////
       // SECOND STEP
       std::vector<wf2_t> wf2;
       for (Direction mu; mu.is_good(); ++mu)
 	wf2.push_back(wf2_t(mu, eps, F, R[mu], Util));
-      // t = 0, mu = 0
-      typename bnd_kernel<Fld_t, do_ct>::wf2t_t bndk2(Direction(0), eps, F, R[0], Util);
-      U.apply_on_timeslice(bndk2, 0);
-      // t = a, mu = 0
-      U.apply_on_timeslice(wf2[0], 1);
-      // t = a, mu = 1,2,..., D-1
-      for (Direction mu(1); mu.is_good(); ++mu){
-	typename bnd_kernel<Fld_t, do_ct>::wf2s_early_t tmp(mu, eps, F, R[mu], Util);
-	U.apply_on_timeslice(tmp, 1);
-      }
-      // t = 2*a, ..., T-2
-      for (int t = 2; t < T-1; ++t)
+      for (int t = 0; t < T; ++t)
 	for (Direction mu; mu.is_good(); ++mu)
 	  U.apply_on_timeslice(wf2[mu], t);
-      // t = T - 1, mu = 1,2,..., D-1
-      for (Direction mu(1); mu.is_good(); ++mu){
-	typename bnd_kernel<Fld_t, do_ct>::wf2s_late_t tmp(mu, eps, F, R[mu], Util);
-	U.apply_on_timeslice(tmp, T-1);
+
+      // subtraction on zero modes
+      for (Direction mu(0); mu.is_good(); ++mu) {
+	wf2[mu].reduce();
+	zm::subtract_zero<Fld_t>(U,mu,wf2[mu].M[0]);
       }
-      // t = T - 1, mu = 0
-      U.apply_on_timeslice(bndk2, T-1);
-   }
-     ////////////////////////////////////////////////////////////
+      
+    }
+    
+    ////////////////////////////////////////////////////////////
     //
-    //  Perform a gauge update on the SF d.o.f. using a first-order
+    //  Perform a gauge update using a first-order
     //  Runge-Kutta (speak: Euler) scheme.
     //
     //  \warning    Not thoroughly tested.
     //
     //  \date      Thu Feb 22 12:29:21 2013
     //  \author    Dirk Hesse <dirk.hesse@fis.unipr.it>
-
-    template <class Fld_t>
+    template <class Fld_t,class Staple_k>
     void RK1_update(Fld_t& U, const double& eps){
       typedef typename detail::rand_gen_<Fld_t>::RandField RK_t;
-      typedef typename kernels::gauge_update::GU_RK1<Fld_t, kernels::StapleSqKernel<Fld_t>, RK_t > wf1_t;
+      typedef typename kernels::gauge_update::GU_RK1<Fld_t, Staple_k, RK_t > wf1_t;
       typedef typename kernels::std_types<Fld_t>::direction_t Direction;
       static detail::rand_gen_<Fld_t> R(U);
       R.update();
       Fld_t F(U);
-      int T = U.extent(0) - 1;
+      int T = U.extent(0);
+      
       std::vector<wf1_t> wf1;
-      for (Direction mu; mu.is_good(); ++mu)
+      for (Direction mu(0); mu.is_good(); ++mu)
 	wf1.push_back(wf1_t(mu, eps, F, R[mu]));
-      U.apply_on_timeslice(wf1[0], 0);
-      for (int t = 1; t < T; ++t)
-	for (Direction mu; mu.is_good(); ++mu)
+
+      for (int t = 0; t < T; ++t)
+	for (Direction mu(0); mu.is_good(); ++mu)
 	  U.apply_on_timeslice(wf1[mu], t);
+
+      // subtraction on zero modes
+      for (Direction mu(0); mu.is_good(); ++mu) {
+	wf1[mu].reduce();
+	zm::subtract_zero<Fld_t>(U,mu,wf1[mu].M[0]);
+      }
     }
-  }
-}
+  } // namespace::gu
+} // namespace::meth
 
 #endif

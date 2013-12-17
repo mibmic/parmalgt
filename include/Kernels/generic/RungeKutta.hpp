@@ -10,189 +10,6 @@
 
 namespace kernels {
 
-  namespace flow {
-
-    ////////////////////////////////////////////////////////////
-    //
-    //  Wilson flow, with third order Runge-Kutta like in Martin
-    //  Lüscher's paper, first step.
-    //
-    //  \warning   NOT THOROUGHLY TESTED!
-    //
-    //  \date      Thu Feb 21 19:08:38 2013
-    //  \author    Dirk Hesse <dirk.hesse@fis.unipr.it>
-    template <class Field_t, class StapleK_t>
-    struct WF_RK_1 {
-      
-      // collect info about the field
-      FLD_INFO(Field_t);
-  
-      // checker board hyper cube size
-      // c.f. geometry and localfield for more info
-      static const int n_cb = StapleK_t::n_cb;    
-      
-      Direction mu;
-      double taug;
-      Field_t *F;
-      
-      WF_RK_1(const Direction& nu, const double& t, Field_t& FF) :
-        mu(nu), taug(t), F(&FF) { }
-  
-      void operator()(Field_t& U, const Point& n) {
-        // Make a Kernel to calculate and store the plaquette(s)
-        StapleK_t st(mu); // maye make a vector of this a class member
-        st(U,n);
-        (*F)[n][mu] = st.reduce();
-        //ptsu3 tmp  = st.reduce().reH() * -taug;
-        U[n][mu] = exp<BGF, ORD>( (*F)[n][mu].reH() * -0.25 * taug)*U[n][mu]; // back to SU3
-      }
-    };
-    
-    ////////////////////////////////////////////////////////////
-    //
-    //  Wilson flow, with third order Runge-Kutta like in Martin
-    //  Lüscher's paper, second step.
-    //
-    //  \warning   NOT THOROUGHLY TESTED!
-    //
-    //  \date      Thu Feb 21 19:10:03 2013
-    //  \author    Dirk Hesse <dirk.hesse@fis.unipr.it>
-    template <class Field_t, class StapleK_t>
-    struct WF_RK_2 {
-      
-      // collect info about the field
-      FLD_INFO(Field_t);
-  
-      // checker board hyper cube size
-      // c.f. geometry and localfield for more info
-      static const int n_cb = StapleK_t::n_cb;    
-      
-      Direction mu;
-      double taug;
-      Field_t *F;
-      
-      WF_RK_2(const Direction& nu, const double& t, Field_t& FF) :
-        mu(nu), taug(t), F(&FF) { }
-  
-      void operator()(Field_t& U, const Point& n) {
-        // Make a Kernel to calculate and store the plaquette(s)
-        StapleK_t st(mu); // maye make a vector of this a class member
-        st(U,n);
-        (*F)[n][mu] = (*F)[n][mu] * -17./36 + 8./9 * st.reduce();
-        //ptsu3 tmp  = st.reduce().reH() * -taug;
-        U[n][mu] = exp<BGF, ORD>( (*F)[n][mu].reH() * -taug)*U[n][mu]; // back to SU3
-      }
-    };
-
-    ////////////////////////////////////////////////////////////
-    //
-    //  Wilson flow, with third order Runge-Kutta like in Martin
-    //  Lüscher's paper, third step.
-    //
-    //  \warning   NOT THOROUGHLY TESTED!
-    //
-    //  \date      Thu Feb 21 19:10:14 2013
-    //  \author    Dirk Hesse <dirk.hesse@fis.unipr.it>
-    template <class Field_t, class StapleK_t>
-    struct WF_RK_3 {
-      
-      // collect info about the field
-      FLD_INFO(Field_t);
-  
-      // checker board hyper cube size
-      // c.f. geometry and localfield for more info
-      static const int n_cb = StapleK_t::n_cb;    
-      
-      Direction mu;
-      double taug;
-      Field_t *F;
-      
-      WF_RK_3(const Direction& nu, const double& t, Field_t& FF) :
-        mu(nu), taug(t), F(&FF) { }
-  
-      void operator()(Field_t& U, const Point& n) {
-        // Make a Kernel to calculate and store the plaquette(s)
-        StapleK_t st(mu); // maye make a vector of this a class member
-        st(U,n);
-        (*F)[n][mu] = st.reduce() * 3./4 -(*F)[n][mu];
-        //ptsu3 tmp  = st.reduce().reH() * -taug;
-        U[n][mu] = exp<BGF, ORD>( (*F)[n][mu].reH() * -taug)*U[n][mu]; // back to SU3
-      }
-    };
-    ////////////////////////////////////////////////////////////
-    //
-    //  Wilson flow, with second order Runge-Kutta, frist step.
-    //
-    //
-    //  \warning   NOT THOROUGHLY TESTED!
-    //
-    //  \date      Thu Feb 21 19:10:47 2013
-    //  \author    Dirk Hesse <dirk.hesse@fis.unipr.it>
-    template <class Field_t, class StapleK_t>
-    struct WF_RK2_1 {
-      
-      // collect info about the field
-      FLD_INFO(Field_t);
-  
-      // checker board hyper cube size
-      // c.f. geometry and localfield for more info
-      static const int n_cb = StapleK_t::n_cb;    
-      
-      Direction mu;
-      double taug;
-      double staug;
-      Field_t *F, *Utilde;
-      
-      WF_RK2_1(const Direction& nu, const double& t, Field_t& FF, Field_t& Util) :
-        mu(nu), taug(t), staug(std::sqrt(t)), F(&FF), Utilde(&Util) { }
-  
-      void operator()(Field_t& U, const Point& n) {
-        // Make a Kernel to calculate and store the plaquette(s)
-        StapleK_t st(mu); // maye make a vector of this a class member
-        st(U,n);
-        (*F)[n][mu] = st.reduce();
-        ptsu3 tmp = (*F)[n][mu].reH() * -taug;
-        (*Utilde)[n][mu] = exp<BGF, ORD>(tmp)*U[n][mu]; // back to SU3
-      }
-    };
-    ////////////////////////////////////////////////////////////
-    //
-    //  Wilson flow, with second order Runge-Kutta, second step.
-    //
-    //  \warning   NOT THOROUGHLY TESTED!
-    //
-    //  \date      Thu Feb 21 19:11:14 2013
-    //  \author    Dirk Hesse <dirk.hesse@fis.unipr.it>
-    template <class Field_t, class StapleK_t>
-    struct WF_RK2_2 {
-      
-      // collect info about the field
-      FLD_INFO(Field_t);
-      // checker board hyper cube size
-      // c.f. geometry and localfield for more info
-      static const int n_cb = StapleK_t::n_cb;    
-      
-      Direction mu;
-      double taug;
-      double staug;
-      Field_t *F, *Utilde;
-      
-      WF_RK2_2(const Direction& nu, const double& t, Field_t& FF, Field_t& Util) :
-        mu(nu), taug(t), staug(std::sqrt(t)), F(&FF), Utilde(&Util) { }
-  
-      void operator()(Field_t& U, const Point& n) {
-        // Make a Kernel to calculate and store the plaquette(s)
-        StapleK_t st(mu); // maye make a vector of this a class member
-        st(*Utilde,n);
-        (*F)[n][mu] += st.reduce();
-	(*F)[n][mu] *= -.5 * taug;
-        for (int i = 0; i < ORD - 2; ++i)
-	  (*F)[n][mu][i + 2] += 0.5 * taug * (*F)[n][mu][i];
-        U[n][mu] = exp<BGF, ORD>( (*F)[n][mu].reH() )* U[n][mu]; // back to SU3
-      }
-    };
-  } // end namespace flow
-
   namespace gauge_update {
     ////////////////////////////////////////////////////////////
     //
@@ -369,9 +186,12 @@ namespace kernels {
       double staug;
       Field_t *F, *Utilde;
       RF_t *R;
-      
+
+      // zero momentum contribution
+      std::vector<ptsu3> M;
+
       GU_RK2_2(const Direction& nu, const double& t, Field_t& FF, RF_t &RR, Field_t& Util) :
-        mu(nu), taug(t), staug(std::sqrt(t)), F(&FF), R(&RR), Utilde(&Util) { }
+        mu(nu), taug(t), staug(std::sqrt(t)), F(&FF), R(&RR), Utilde(&Util), M(omp_get_max_threads()) { }
   
       void operator()(Field_t& U, const Point& n) {
         // Make a Kernel to calculate and store the plaquette(s)
@@ -391,8 +211,17 @@ namespace kernels {
 	//ptsu3 tmp;
 	//tmp[0] -= (*R)[n] * staug;
         //U[n][mu] = exp<BGF, ORD>(tmp)*U[n][mu]; // back to SU3
+	M[omp_get_thread_num()] += get_q(U[n][mu]); // zero momentum contribution
       }
+
+      // reduce vector of zero momentum contribution
+      const ptsu3& reduce(){
+	std::for_each(M.begin()+1, M.end(), [&] (const ptsu3& i){ M[0] += i; } );
+	return M[0];
+      }
+
     };
+
     template <class Field_t, class StapleK_t, class RF_t>
     struct GU_RK1 {
       
@@ -408,9 +237,12 @@ namespace kernels {
       double staug;
       Field_t *F;
       RF_t *R;
+
+      // zero momentum contribution
+      std::vector<ptsu3> M;
       
       GU_RK1(const Direction& nu, const double& t, Field_t& FF, RF_t &RR) :
-        mu(nu), taug(t), staug(std::sqrt(t)), F(&FF), R(&RR) { }
+        mu(nu), taug(t), staug(std::sqrt(t)), F(&FF), R(&RR), M(omp_get_max_threads()) { }
   
       void operator()(Field_t& U, const Point& n) {
         // Make a Kernel to calculate and store the plaquette(s)
@@ -420,6 +252,13 @@ namespace kernels {
 	//ptsu3 tmp;
 	tmp[0] -= (*R)[n] * staug;
         U[n][mu] = exp<BGF, ORD>(tmp)*U[n][mu]; // back to SU3
+	M[omp_get_thread_num()] += get_q(U[n][mu]); // zero momentum contribution
+      }
+
+      // reduce vector of zero momentum contribution
+      const ptsu3& reduce(){
+	std::for_each(M.begin()+1, M.end(), [&] (const ptsu3& i){ M[0] += i; } );
+	return M[0];
       }
     };
   } // end namespace gauge_update

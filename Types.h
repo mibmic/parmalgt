@@ -9,7 +9,7 @@ typedef sun::SU<3> SU3;
 typedef sun::SU<3>::data_t Cplx;
 typedef sun::Vec<3> CVector;
 
-#ifdef HAVE_CXX0X
+#ifdef HAVE_STDCXX_0X
 #include <array>
 typedef std::array<Cplx,3> three_vec_t;
 template <class C, int n> struct array_t 

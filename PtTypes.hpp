@@ -246,7 +246,7 @@ namespace ptt {
   template <int N> inline PtMatrix<N> get_random_pt_matrix(){
     PtMatrix<N> result;
     static ranlxd::Rand r(1235431);
-#ifdef HAVE_CXX0X
+#ifdef HAVE_STDCXX_0X
     for (auto& e : result) { e = SU3rand(r); }
 #else
     for (int i = 0; i < N; ++i)
@@ -270,7 +270,7 @@ namespace ptt {
 
   template <int N>
   inline PtMatrix<N> operator*(const PtMatrix<N>& A, const bgf::AbelianBgf& bg){
-#ifdef HAVE_CXX0X
+#ifdef HAVE_STDCXX_0X
     PtMatrix<N> result(A);
     for (auto& e : result) { e = bg.ApplyFromRight(e); }
 #else
@@ -283,7 +283,7 @@ namespace ptt {
 
   template <int N>
   inline PtMatrix<N> operator*(const PtMatrix<N>& A, const bgf::ScalarBgf& bg){
-#ifdef HAVE_CXX0X
+#ifdef HAVE_STDCXX_0X
     PtMatrix<N> result(A);
     for (auto& e : result) { e = bg.ApplyFromRight(e); }
 #else
@@ -309,7 +309,7 @@ namespace ptt {
 
   template <int N>
   inline PtMatrix<N> operator*(const bgf::AbelianBgf& bg, const PtMatrix<N>& A){
-#ifdef HAVE_CXX0X
+#ifdef HAVE_STDCXX_0X
     PtMatrix<N> result(A);
     for (auto& e : result) { e = bg.ApplyFromLeft(e); }
 #else
@@ -321,7 +321,7 @@ namespace ptt {
   }
   template <int N>
   inline PtMatrix<N> operator*(const bgf::ScalarBgf& bg, const PtMatrix<N>& A){
-#ifdef HAVE_CXX0X
+#ifdef HAVE_STDCXX_0X
     PtMatrix<N> result(A);
     for (auto& e : result) { e = bg.ApplyFromLeft(e); }
 #else

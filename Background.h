@@ -7,7 +7,6 @@
 #include <functional>
 #include <math.h>
 #include <Types.h>
-#include <MyRand.h>
 #include <iostream>
 #include <newMyQCD.h>
 
@@ -870,8 +869,10 @@ namespace bgf {
   };
   
   inline AbelianBgf random(){
-    static MyRand r(134);
-    three_vec_t alpha_v = {r.Rand(), r.Rand(), r.Rand()};
+    srand(time(NULL));
+    three_vec_t alpha_v = {rand()/static_cast<double>(RAND_MAX),
+			   rand()/static_cast<double>(RAND_MAX),
+			   rand()/static_cast<double>(RAND_MAX) };
     return AbelianBgf(alpha_v);
   };
 }

@@ -1,5 +1,7 @@
 # global includes
 
+AUTOMAKE_OPTIONS = foreign subdir-objects
+
 AM_CPPFLAGS = -I${GTEST_DIR}/include -I${GTEST_DIR} -I..\
 	-I${top_srcdir} -I${top_srcdir}/include -DHAVE_TR1 \
 	-DDSFMT_MEXP=19937 -I${top_srcdir}/ranlxd \

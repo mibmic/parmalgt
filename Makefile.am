@@ -1,11 +1,12 @@
-AUTOMAKE_OPTIONS = foreign
+AUTOMAKE_OPTIONS = foreign subdir-objects
+
 AM_CPPFLAGS = -DHAVE_TR1 -DDSFMT_MEXP=19937 -I. -I@abs_top_srcdir@/include\
 	 -I${top_srcdir}/ranlxd -I${top_srcdir}/sun-sources/include
 
 ACLOCAL_AMFLAGS = -I m4
 noinst_HEADERS = Background.h nspt.h MassC.h input.h MyTime.h \
   QCDenvNODEpt.h QCDenvNODE.h Point.hpp newQCDpt.h lattice.h \
-  PtTypes.hpp MyQCD.h newMyQCD.h MyRand.h Types.h dSFMT/dSFMT.h \
+  PtTypes.hpp MyQCD.h newMyQCD.h Types.h \
   choices.h PtAlgo.hpp GammaStuff.h LocalField.hpp Geometry.hpp \
   Kernels.hpp uparam.hpp IO.hpp util.hpp ranlxd/ranlxd.hpp\
   include/Kernels/generic/RungeKutta.hpp Communicator.hpp\
@@ -48,3 +49,4 @@ endif
 docs:
 	mkdir -p ./docs/doxygen
 	doxygen Doxyfile
+

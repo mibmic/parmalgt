@@ -20,7 +20,7 @@ namespace kernels {
 }
 #endif
 
-#define FLD_INFO(F) \
+#define FLD_INFO(F)					\
   typedef typename std_types<F>::ptGluon_t ptGluon;	\
   typedef typename std_types<F>::ptSU3_t ptSU3;		\
   typedef typename std_types<F>::ptsu3_t ptsu3;		\
@@ -100,8 +100,6 @@ namespace dirac {
 
 namespace kernels {
   
-
-
   template <class Field_t> 
   struct base_types {
     typedef typename Field_t::data_t data_t;
@@ -110,8 +108,6 @@ namespace kernels {
     typedef pt::Point<n_dim> point_t;
     typedef pt::Direction<n_dim> direction_t;
   };
-
-
 
   /// struct to extract information on the field from the field type.
   template <class Field_t>
@@ -185,165 +181,6 @@ namespace kernels {
   }
   
 
-  ////////////////////////////////////////////////////////////
-  //
-  // Staple kernel taking into account the boundary correction
-  // c_t. This is meant to act on the TEMPORAL components of the gauge
-  // field at x_0 = 0 and x_0 = T - a.
-  //
-  // \author Dirk Hesse <herr.dirk.hesse@gmail.com>
-  // \date Tue Oct  1 16:36:56 2013
-
-  template <class Field_t>
-  struct StapleSqKernelCtOneTemporal {
-    // collect info about the field
-    FLD_INFO(Field_t);
-
-    typedef typename array_t<ptSU3, 1>::Type ptsu3_array_t;
-
-    // checker board hyper cube size
-    // c.f. geometry and localfield for more info
-    static const int n_cb = 1;
-
-    ptsu3_array_t val;
-    Direction mu;
-
-    StapleSqKernelCtOneTemporal(const Direction& nu) : mu(nu) {  }
-
-    void operator()(Field_t& U, const Point& n) {
-      static const double ct1 = -0.08896;
-      val[0].zero();
-      for(Direction nu; nu.is_good(); ++nu)
-        if(nu != mu){
-          val[0] += U[n + mu][nu] *  dag(U[n][nu] * U[n + nu][mu]);
-          val[0] += dag(U[n-nu][mu] * U[n+mu-nu][nu]) * U[n - nu][nu];
-        }
-      // Close the staple
-      val[0] = U[n][mu] * val[0];
-      // Apply ct, i.e.
-      // staple = staple * (1 + g_0^2 c_t^(1))
-      for (int i = 2; i < ORD; ++i)
-	val[0][i] += val[0][i-2] * ct1;
-      // background contribution
-      inplace_add(val[0][1], val[0].bgf() * ct1);
-    }
-    
-    ptSU3& reduce() { 
-      return val[0]; 
-    }
-
-  };
-
-  ////////////////////////////////////////////////////////////
-  //
-  // Staple kernel taking into account the boundary correction
-  // c_t. This is meant to act on the SPATIAL components of the gauge
-  // field at x_0 = a.
-  //
-  // \author Dirk Hesse <herr.dirk.hesse@gmail.com>
-  // \date Tue Oct  1 16:41:11 2013
-
-  template <class Field_t>
-  struct StapleSqKernelCtOneSpatialEarly {
-    // collect info about the field
-    FLD_INFO(Field_t);
-
-    typedef typename array_t<ptSU3, 1>::Type ptsu3_array_t;
-
-    // checker board hyper cube size
-    // c.f. geometry and localfield for more info
-    static const int n_cb = 1;
-
-    ptsu3_array_t val;
-    Direction mu;
-
-    StapleSqKernelCtOneSpatialEarly(const Direction& nu) : mu(nu) {  }
-
-    void operator()(Field_t& U, const Point& n) {
-      static const double ct1 = -0.08896;
-      val[0].zero();
-      Direction nu;
-      if(nu != mu){
-	val[0] += dag(U[n-nu][mu] * U[n+mu-nu][nu]) * U[n - nu][nu];
-	// contains temproal link -> factor of ct ...
-	// staple = staple * (1 + g_0^2 c_t^(1))
-	for (int i = 2; i < ORD; ++i)
-	  val[0][i] += val[0][i-2] * ct1;
-	// background contribution
-	inplace_add(val[0][1], val[0].bgf() * ct1);
-	val[0] += U[n + mu][nu] *  dag(U[n][nu] * U[n + nu][mu]);
-      }
-      for(++nu; nu.is_good(); ++nu)
-        if(nu != mu){
-          val[0] += U[n + mu][nu] *  dag(U[n][nu] * U[n + nu][mu]);
-          val[0] += dag(U[n-nu][mu] * U[n+mu-nu][nu]) * U[n - nu][nu];
-        }
-      // Close the staple
-      val[0] = U[n][mu] * val[0];
-      // Apply ct, i.e.
-    }
-    
-    ptSU3& reduce() { 
-      return val[0]; 
-    }
-  };
-
-  ////////////////////////////////////////////////////////////
-  //
-  // Staple kernel taking into account the boundary correction
-  // c_t. This is meant to act on the SPATIAL components of the gauge
-  // field at x_0 = T - a.
-  //
-  // \author Dirk Hesse <herr.dirk.hesse@gmail.com>
-  // \date Tue Oct  1 16:42:11 2013
-
-
-  template <class Field_t>
-  struct StapleSqKernelCtOneSpatialLate {
-    // collect info about the field
-    FLD_INFO(Field_t);
-
-    typedef typename array_t<ptSU3, 1>::Type ptsu3_array_t;
-
-    // checker board hyper cube size
-    // c.f. geometry and localfield for more info
-    static const int n_cb = 1;
-
-    ptsu3_array_t val;
-    Direction mu;
-
-    StapleSqKernelCtOneSpatialLate(const Direction& nu) : mu(nu) {  }
-
-    void operator()(Field_t& U, const Point& n) {
-      static const double ct1 = -0.08896;
-      val[0].zero();
-      Direction nu;
-      if (nu != mu){
-	val[0] += U[n + mu][nu] *  dag(U[n][nu] * U[n + nu][mu]);
-	// contains temporal link -> factor of ct ...
-	// staple = staple * (1 + g_0^2 c_t^(1))
-	for (int i = 2; i < ORD; ++i)
-	  val[0][i] += val[0][i-2] * ct1;
-	// background contribution
-	inplace_add(val[0][1], val[0].bgf() * ct1);
-	val[0] += dag(U[n-nu][mu] * U[n+mu-nu][nu]) * U[n - nu][nu];
-      }
-      for(++nu; nu.is_good(); ++nu)
-        if(nu != mu){
-          val[0] += U[n + mu][nu] *  dag(U[n][nu] * U[n + nu][mu]);
-          val[0] += dag(U[n-nu][mu] * U[n+mu-nu][nu]) * U[n - nu][nu];
-        }
-      // Close the staple
-      val[0] = U[n][mu] * val[0];
-     
-    }
-    
-    ptSU3& reduce() { 
-      return val[0]; 
-    }
-
-  };
-
 
   ////////////////////////////////////////////////////////////
   ////////////////////////////////////////////////////////////
@@ -390,23 +227,23 @@ namespace kernels {
 
     ptSU3 two_by_one(Field_t& U, const Point& n, const Direction& nu){
       return U[n + mu][mu] * U[n + mu + mu][nu] * 
-             dag(U[n][nu] * U[n+nu][mu] * U[n+nu+mu][mu])
-           + U[n+mu][mu] * dag( U[n-nu][mu] * 
-             U[n+mu-nu][mu] * U[n+mu+mu-nu][nu] ) * U[n-nu][nu]
-           + U[n+mu][nu] * dag( U[n-mu][nu] * 
-             U[n-mu+nu][mu] * U[n+nu][mu] ) * U[n-mu][mu]
-           + dag( U[n-nu-mu][mu] * U[n-nu][mu] * U[n-nu+mu][nu] ) * 
-             U[n-nu-mu][nu] * U[n-mu][mu];
+	dag(U[n][nu] * U[n+nu][mu] * U[n+nu+mu][mu])
+	+ U[n+mu][mu] * dag( U[n-nu][mu] * 
+			     U[n+mu-nu][mu] * U[n+mu+mu-nu][nu] ) * U[n-nu][nu]
+	+ U[n+mu][nu] * dag( U[n-mu][nu] * 
+			     U[n-mu+nu][mu] * U[n+nu][mu] ) * U[n-mu][mu]
+	+ dag( U[n-nu-mu][mu] * U[n-nu][mu] * U[n-nu+mu][nu] ) * 
+	U[n-nu-mu][nu] * U[n-mu][mu];
     }
     ptSU3 one_by_two(Field_t& U, const Point& n, const Direction& nu){
       return U[n + mu][nu] * U[n+mu+nu][nu] * 
-             dag(U[n][nu] * U[n+nu][nu] * U[n+nu+nu][mu]) 
-           + dag( U[n-nu-nu][mu] * U[n-nu-nu+mu][nu] * U[n-nu+mu][nu] ) * 
-             U[n-nu-nu][nu] * U[n-nu][nu];
+	dag(U[n][nu] * U[n+nu][nu] * U[n+nu+nu][mu]) 
+	+ dag( U[n-nu-nu][mu] * U[n-nu-nu+mu][nu] * U[n-nu+mu][nu] ) * 
+	U[n-nu-nu][nu] * U[n-nu][nu];
     }
     ptSU3 one_by_one(Field_t& U, const Point& n, const Direction& nu){
-       return U[n + mu][nu] *  dag(U[n][nu] * U[n + nu][mu])
-	    + dag(U[n-nu][mu] * U[n+mu-nu][nu]) * U[n - nu][nu];
+      return U[n + mu][nu] *  dag(U[n][nu] * U[n + nu][mu])
+	+ dag(U[n-nu][mu] * U[n+mu-nu][nu]) * U[n - nu][nu];
     }
     
     void operator()(Field_t& U, const Point& n) {      
@@ -515,7 +352,7 @@ namespace kernels {
 	    class StapleK_t, class Process >
   struct GaugeUpdateKernel {
 
-  // collect info about the field
+    // collect info about the field
     typedef typename std_types<Field_t>::ptGluon_t ptGluon;
     typedef typename std_types<Field_t>::ptSU3_t ptSU3;
     typedef typename std_types<Field_t>::ptsu3_t ptsu3;
@@ -532,14 +369,12 @@ namespace kernels {
     // c.f. geometry and localfield for more info
     static const int n_cb = StapleK_t::n_cb;    
 
-    // for testing, c.f. below
-    static std::vector<MyRand> rands;
-    //static MyRand Rand;
-    Direction mu;
+    // zero momentum contribution
+    std::vector<ptsu3> M;
 
-#ifndef SF
-    std::vector<ptsu3> M; // zero momentum contribution
-#endif
+    // for testing, c.f. below
+    static std::vector<ranlxd::Rand> rands;
+    Direction mu;
     
     double taug, stau;
 
@@ -548,9 +383,7 @@ namespace kernels {
 
     GaugeUpdateKernel(const Direction& nu, const double& t) :
       mu(nu), 
-#ifndef SF
       M(omp_get_max_threads()), 
-#endif
       taug(t), stau(sqrt(t)), 
       plaq(omp_get_max_threads(), std::vector<Cplx>(ORD+1)), 
       pp(omp_get_max_threads(), std::vector<Cplx>(ORD+1)) { }
@@ -559,8 +392,6 @@ namespace kernels {
 
     void operator()(Field_t& U, const Point& n) {
       ptSU3 W;
-
-      // We wants this static, but it fails ... field grows bigger and bigger ...
 
       // Make a Kernel to calculate and store the plaquette(s)
       StapleK_t st(mu); // maye make a vector of this a class member
@@ -571,194 +402,26 @@ namespace kernels {
       pp[omp_get_thread_num()] = (st.val[0].trace()); // Save the 1x1 plaquette
 
       for(cpx_vec_it k = plaq[omp_get_thread_num()].begin(), 
-      j = pp[omp_get_thread_num()].begin(),
-      e = plaq[omp_get_thread_num()].end(); 
+	    j = pp[omp_get_thread_num()].begin(),
+	    e = plaq[omp_get_thread_num()].end(); 
       	  k != e; ++k, ++j) *k += *j;
 
       ptsu3 tmp  = st.reduce().reH() * -taug;
 
-      // DH Feb. 6, 2012
-      // ptsu3 tmp  = W.reH() * -taug; // take to the algebra
-      //tmp[0] -= stau*SU3rand(Rand); // add noise
-      // use this to check if the multithreaded version gives 
-      // identical results to the single threaded one
-      //
-      // WARNING
-      // since we use stau as a pre-factor, it looks like the random
-      // matrices are normalized to sqrt(2)!
       tmp[0] -= stau*sun::SU3rand(rands.at(n));
       U[n][mu] = exp<BGF, ORD>(tmp)*U[n][mu]; // back to SU3
-      //#pragma omp critical // TODO maybe one can use a reduce or so here
-#ifndef SF
-      M[omp_get_thread_num()] += get_q(U[n][mu]); // zero momentum contribution
-#endif
+      M[mu][omp_get_thread_num()] += get_q(U[n][mu]); // zero momentum contribution
     }
     
     void reduce(){
-      //outer_cvec_it i = plaq.begin();
-      //outer_cvec_it pe = plaq.end();
-      //if (++i != plaq.end())
-      //  for (; i != pe; ++i)
-      //	  plaq[0] += *i;
-#ifndef SF
-      typename std::vector<ptsu3>::iterator j = M.begin();
-      if (++j != M.end())
-        for (; j != M.end(); ++j)
-          M[0] += *j;
-#endif
+      std::for_each(M.begin()+1, M.end(), [&] (const ptsu3& i){ M[0] += i; } );
     }
     
   };
-  //////////////////////////////////////////////////////////////////////
-  //////////////////////////////////////////////////////////////////////
-  ///
-  ///  Kernel for the Wilson flow, simple Euler scheme.
-  ///
-  ///  \tparam Field_t The type of field (I guess usually some sort of
-  ///  gluon field) that the gauge update should be applied to.
-  ///  \tparam StapleK_t The type of staple to use. This is employed
-  ///  to implement e.g. improved gluon actions.
-  ///  \tparam Process This must be a class that has two methods,
-  ///  called pre_process and post_process. They are applied before
-  ///  and after the gauge update is performed to be able to do things
-  ///  like adjusting the weights of plaquettes at the boundary for
-  ///  improved actions.
-  ///
-  ///  \author Dirk Hesse <herr.dirk.hesse@gmail.com>
-  ///  \date Thu May 24 17:47:43 2012
 
-  template <class Field_t, 
-	    class StapleK_t, class Process >
-  struct WilFlowKernel {
-
-  // collect info about the field
-    typedef typename std_types<Field_t>::ptGluon_t ptGluon;
-    typedef typename std_types<Field_t>::ptSU3_t ptSU3;
-    typedef typename std_types<Field_t>::ptsu3_t ptsu3;
-    typedef typename std_types<Field_t>::bgf_t BGF;
-    typedef typename std_types<Field_t>::point_t Point;
-    typedef typename std_types<Field_t>::direction_t Direction;
-    static const int ORD = std_types<Field_t>::order;
-    static const int DIM = std_types<Field_t>::n_dim;
-
-    // checker board hyper cube size
-    // c.f. geometry and localfield for more info
-    static const int n_cb = StapleK_t::n_cb;    
-
-    Direction mu;
-
-    double taug;
-
-    WilFlowKernel(const Direction& nu, const double& t) :
-      mu(nu), taug(t) { }
-
-    void operator()(Field_t& U, const Point& n) {
-      // Make a Kernel to calculate and store the plaquette(s)
-      StapleK_t st(mu); // maye make a vector of this a class member
-      Process::pre_process(U,n,mu);
-      st(U,n);
-      Process::post_process(U,n,mu);
-      
-      ptsu3 tmp  = st.reduce().reH() * -taug;
-
-      U[n][mu] = exp<BGF, ORD>(tmp)*U[n][mu]; // back to SU3
-
-    }
-  };
   
 
-
-  template <class Field_t, 
-	    class StapleK_t, class Process >
-  struct WilFlowMeasKernel {
-
-  // collect info about the field
-    typedef typename std_types<Field_t>::ptGluon_t ptGluon;
-    typedef typename std_types<Field_t>::ptSU3_t ptSU3;
-    typedef typename std_types<Field_t>::ptsu3_t ptsu3;
-    typedef typename std_types<Field_t>::bgf_t BGF;
-    typedef typename std_types<Field_t>::point_t Point;
-    typedef typename std_types<Field_t>::direction_t Direction;
-    static const int ORD = std_types<Field_t>::order;
-    static const int DIM = std_types<Field_t>::n_dim;
-
-    // checker board hyper cube size
-    // c.f. geometry and localfield for more info
-    static const int n_cb = StapleK_t::n_cb;    
-
-    Direction mu;
-
-    double taug, stau;
-
-    WilFlowMeasKernel(const Direction& nu, const double& t,
-                  Field_t& targ) :
-      mu(nu), taug(t), stau(sqrt(t)), target(&targ) { }
-
-
-
-    void operator()(Field_t& U, const Point& n) {
-      ptSU3 W;
-
-      // Make a Kernel to calculate and store the plaquette(s)
-      StapleK_t st(mu); // maye make a vector of this a class member
-      Process::pre_process(U,n,mu);
-      st(U,n);
-      Process::post_process(U,n,mu);
-      
-      ptsu3 tmp  = st.reduce().reH() * -taug;
-
-      (*target)[n][mu] = exp<BGF, ORD>(tmp); // back to SU3
-
-    }
-
-    Field_t *target;
-  };
-
-  template <class Field_t,
-	    class StapleK_t, class Process >
-  struct WilFlowApplyKernel {
-
-  // collect info about the field
-    typedef typename std_types<Field_t>::ptGluon_t ptGluon;
-    typedef typename std_types<Field_t>::ptSU3_t ptSU3;
-    typedef typename std_types<Field_t>::ptsu3_t ptsu3;
-    typedef typename std_types<Field_t>::bgf_t BGF;
-    typedef typename std_types<Field_t>::point_t Point;
-    typedef typename std_types<Field_t>::direction_t Direction;
-    static const int ORD = std_types<Field_t>::order;
-    static const int DIM = std_types<Field_t>::n_dim;
-
-    // checker board hyper cube size
-    // c.f. geometry and localfield for more info
-    static const int n_cb = StapleK_t::n_cb;
-
-    Direction mu;
-
-    double taug, stau;
-
-    WilFlowApplyKernel(const Direction& nu, const double& t,
-                       Field_t &src) :
-      mu(nu), taug(t), stau(sqrt(t)), source(&src) { }
-
-
-    void operator()(Field_t& U, const Point& n) {
-      ptSU3 W;
-
-      // Make a Kernel to calculate and store the plaquette(s)
-      StapleK_t st(mu); // maye make a vector of this a class member
-      Process::pre_process(U,n,mu);
-      st(U,n);
-      Process::post_process(U,n,mu);
-
-      ptsu3 tmp  = st.reduce().reH() * -taug;
-
-      U[n][mu] = (*source)[n][mu]*U[n][mu]; // back to SU3
-    }
-    Field_t *source;
-  };
-
-
-template <class C, class P, class Q> std::vector<MyRand>
+  template <class C, class P, class Q> std::vector<ranlxd::Rand>
   kernels::GaugeUpdateKernel<C,P,Q>::rands;
 
   template <class Field_t> struct RSU3Kernel {
@@ -769,13 +432,9 @@ template <class C, class P, class Q> std::vector<MyRand>
     // Choose random number generator to use
     // Note that you have to change the same lines
     // in Methods.hpp
-    //*/
+
     // using RANLUX
     typedef std::vector<ranlxd::Rand> rand_vec_t;
-    /*/
-    // using MyRand
-    typedef std::vector<MyRand> rand_vec_t;
-    //*/
     static rand_vec_t rands;
     static const int n_cb = 0;
 
@@ -819,81 +478,81 @@ template <class C, class P, class Q> std::vector<MyRand>
 
     explicit GaugeFixingKernel (const double& a) : alpha (a) { }
     void operator()(Field_t& U, const Point& n) const { 
-    do_it(U, n, mode_selektor<METHOD>());
+      do_it(U, n, mode_selektor<METHOD>());
     }
 
     // checker board hyper cube size
     // c.f. geometry and localfield for more info
     static const int n_cb = 1;
 
-private:
+  private:
     double alpha;
-  template <int M> struct mode_selektor { };
-  void do_it(Field_t& U, const Point& n, 
-             const mode_selektor<1>&) const {
-    // exp version
-    ptSU3 omega;
-    for (Direction mu; mu.is_good(); ++mu)
-      omega += U[n - mu][mu] - U[n][mu] ;
+    template <int M> struct mode_selektor { };
+    void do_it(Field_t& U, const Point& n, 
+	       const mode_selektor<1>&) const {
+      // exp version
+      ptSU3 omega;
+      for (Direction mu; mu.is_good(); ++mu)
+	omega += U[n - mu][mu] - U[n][mu] ;
     
-    ptSU3 Omega = exp<BGF, ORD>( alpha * omega.reH());
-    ptSU3 OmegaDag = exp<BGF, ORD>( -alpha * omega.reH());
+      ptSU3 Omega = exp<BGF, ORD>( alpha * omega.reH());
+      ptSU3 OmegaDag = exp<BGF, ORD>( -alpha * omega.reH());
     
-    for (Direction mu; mu.is_good(); ++mu){
-      U[n][mu] = Omega * U[n][mu];
-      U[n - mu][mu] *= OmegaDag;
+      for (Direction mu; mu.is_good(); ++mu){
+	U[n][mu] = Omega * U[n][mu];
+	U[n - mu][mu] *= OmegaDag;
+      }
     }
-  }
-  void do_it(Field_t& U, const Point& n,
-             const mode_selektor<2>&) const {
-    ptSU3 omega;
-    for (Direction mu; mu.is_good(); ++mu){
-      omega += (U[n][mu] * dag(U[n][mu].bgf()) *
-            dag( U[n - mu][mu] ) * U[n - mu][mu].bgf());
+    void do_it(Field_t& U, const Point& n,
+	       const mode_selektor<2>&) const {
+      ptSU3 omega;
+      for (Direction mu; mu.is_good(); ++mu){
+	omega += (U[n][mu] * dag(U[n][mu].bgf()) *
+		  dag( U[n - mu][mu] ) * U[n - mu][mu].bgf());
+      }
+      ptSU3 Omega = exp<BGF, ORD>( alpha * omega.reH());
+      ptSU3 OmegaDag = exp<BGF, ORD>( -alpha * omega.reH());
+      for (Direction mu; mu.is_good(); ++mu){
+	U[n][mu] = Omega * U[n][mu];
+	U[n - mu][mu] *= OmegaDag;
+      }
     }
-    ptSU3 Omega = exp<BGF, ORD>( alpha * omega.reH());
-    ptSU3 OmegaDag = exp<BGF, ORD>( -alpha * omega.reH());
-    for (Direction mu; mu.is_good(); ++mu){
-      U[n][mu] = Omega * U[n][mu];
-      U[n - mu][mu] *= OmegaDag;
+    void do_it(Field_t& U, const Point& n,
+	       const mode_selektor<3>&) const {
+      ptSU3 omega;
+      omega.zero();
+      for (Direction mu; mu.is_good(); ++mu){
+	ptSU3 Udag = dag(U[n - mu][mu]);
+	BGF Vdag = U[n][mu].bgf().dag(), V = Udag.bgf().dag();
+	omega += U[n][mu]*Vdag*Udag*V;
+      }
+      ptSU3 Omega = exp<BGF, ORD>( -alpha * omega.reH());
+      ptSU3 OmegaDag = exp<BGF, ORD>( alpha * omega.reH());
+      for (Direction mu; mu.is_good(); ++mu){
+	U[n][mu] = Omega * U[n][mu];
+	U[n - mu][mu] *= OmegaDag;
+      }
     }
-  }
-  void do_it(Field_t& U, const Point& n,
-             const mode_selektor<3>&) const {
-    ptSU3 omega;
-    omega.zero();
-    for (Direction mu; mu.is_good(); ++mu){
-      ptSU3 Udag = dag(U[n - mu][mu]);
-      BGF Vdag = U[n][mu].bgf().dag(), V = Udag.bgf().dag();
-      omega += U[n][mu]*Vdag*Udag*V;
-    }
-    ptSU3 Omega = exp<BGF, ORD>( -alpha * omega.reH());
-    ptSU3 OmegaDag = exp<BGF, ORD>( alpha * omega.reH());
-    for (Direction mu; mu.is_good(); ++mu){
-      U[n][mu] = Omega * U[n][mu];
-      U[n - mu][mu] *= OmegaDag;
-    }
-  }
 
-  void do_it(Field_t& U, const Point& n, 
-             const mode_selektor<4>&) const {
-    // exp version
-    ptSU3 omega;
-    for (Direction mu; mu.is_good(); ++mu)
-      omega += dag(U[n-mu][mu].bgf())*U[n - mu][mu] 
-	- U[n][mu]*dag(U[n][mu].bgf());
+    void do_it(Field_t& U, const Point& n, 
+	       const mode_selektor<4>&) const {
+      // exp version
+      ptSU3 omega;
+      for (Direction mu; mu.is_good(); ++mu)
+	omega += dag(U[n-mu][mu].bgf())*U[n - mu][mu] 
+	  - U[n][mu]*dag(U[n][mu].bgf());
     
-    ptSU3 Omega = exp<BGF, ORD>( alpha * omega.reH());
-    ptSU3 OmegaDag = exp<BGF, ORD>( -alpha * omega.reH());
+      ptSU3 Omega = exp<BGF, ORD>( alpha * omega.reH());
+      ptSU3 OmegaDag = exp<BGF, ORD>( -alpha * omega.reH());
     
-    for (Direction mu; mu.is_good(); ++mu){
-      U[n][mu] = Omega * U[n][mu];
-      U[n - mu][mu] *= OmegaDag;
+      for (Direction mu; mu.is_good(); ++mu){
+	U[n][mu] = Omega * U[n][mu];
+	U[n - mu][mu] *= OmegaDag;
+      }
     }
-  }
 
-};
-
+  };
+  
   //////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////
   ///
@@ -907,9 +566,8 @@ private:
   ///  \date Thu May 24 17:50:47 2012
 
   template <class Field_t>
-  struct ZeroModeSubtractionKernel
-  {
-
+  struct ZeroModeSubtractionKernel {
+    
     // collect info about the field
     typedef typename std_types<Field_t>::ptGluon_t ptGluon;
     typedef typename std_types<Field_t>::ptSU3_t ptSU3;
@@ -922,10 +580,11 @@ private:
 
     // checker board hyper cube size
     // c.f. geometry and localfield for more info
-    static const int n_cb = 1;
+    static const int n_cb = 0;
 
     Direction mu;
-    ptSU3 M; // zero momentum contribution
+    ptsu3 M; // zero momentum contribution
+    double norm;
     //////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////
     ///
@@ -937,15 +596,17 @@ private:
     ///  \param N The sum over the zero modes to be subtracted.
     ///  \author Dirk Hesse <herr.dirk.hesse@gmail.com>
     ///  \date Thu May 24 17:51:17 2012
-    ZeroModeSubtractionKernel(const Direction& nu, const ptsu3& N) :
-      mu(nu), M(exp<BGF, ORD>(-1*reH(N))) { }
+    ZeroModeSubtractionKernel(Field_t& U, 
+			      const Direction& nu, const ptsu3& N) :
+      mu(nu), M(N), norm(1./static_cast<double>(U.vol())) { }
 
     void operator()(Field_t& U, const Point& n) {
-      U[n][mu] = M * U[n][mu];
-  }
-};
+      U[n][mu] = exp<BGF,ORD>(get_q(U[n][mu])-norm*M);
+    }
+    
+  };
   
-
+  
   //////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////
   ///
@@ -986,7 +647,7 @@ private:
     }
 
     void impl(Field_t& U, const Point& n, const bgf::ScalarBgf&)
-    const { }
+      const { }
 
   };
 
@@ -1079,7 +740,7 @@ private:
       val += tmp;
     }
   
-};
+  };
 
   template <class Field_t, class OutputIterator>
   struct Buffer {
@@ -1120,7 +781,7 @@ private:
     }
   };
 
-// Measure the average paquette
+  // Measure the average paquette
   template <class Field_t>
   struct PlaqKernel {
 
@@ -1133,24 +794,34 @@ private:
     typedef typename std_types<Field_t>::direction_t Direction;
     static const int ORD = std_types<Field_t>::order;
     static const int DIM = std_types<Field_t>::n_dim;
-
+    static const int nc  = ptSU3::SU3_t::size;
     // checker board hyper cube size
     // c.f. geometry and localfield for more info
     static const int n_cb = 0;
+    
+    const double norm = DIM*(DIM-1)*nc;
 
-    ptSU3 val;
+    std::vector<ptSU3> val;
     
-    PlaqKernel () : val(bgf::zero<BGF>()) { }
-    
+    PlaqKernel () : val(omp_get_max_threads(),
+			ptSU3(bgf::zero<BGF>())) { }
+ 
     void operator()(Field_t& U, const Point& n){
       ptSU3 tmp(bgf::zero<BGF>());
       for (Direction mu(0); mu.is_good(); ++mu)
         for (Direction nu(0); nu.is_good(); ++nu)
-          tmp += U[n][mu] * U[n + mu][nu] * 
-            dag( U[n][nu] * U[n + nu][mu] );
-#pragma omp critical
-      val += tmp;
+	  if( nu != mu )
+	    tmp += U[n][mu] * U[n + mu][nu] * 
+	      dag( U[n][nu] * U[n + nu][mu] );
+      val[omp_get_thread_num()] += tmp;
     }
+
+    const ptSU3& reduce() {
+      for( auto it = val.begin()+1; it != val.end(); ++it) 
+	val[0] += (*it);
+      return (val[0] /= norm);
+    }
+    
   };
   
   // Kernel to construct the gauge fixing function at t = 0
@@ -1202,7 +873,7 @@ private:
     static const int n_cb = 0;
 
     GFApplyKernel (ptsu3 omega, const double& alpha,
-                                 const int& L) { 
+		   const int& L) { 
       for (int r = 0; r < ORD; ++r)
         for (int i = 0; i < 3; ++i)
           for (int j = 0; j < 3; ++j)
@@ -1239,7 +910,7 @@ private:
     static const int n_cb = 0;
 
     GFApplyKernelTRBG (ptsu3 omega, const double& alpha,
-                                 const int& L) { 
+		       const int& L) { 
       omega /= L*L*L;
       Omega = exp<BGF, ORD>( -alpha * omega.reH());
     }
@@ -1781,7 +1452,7 @@ private:
     static const int n_cb = 0;
     
     WilsonTreeLevelKernel(const Field_t& G, const FermionField& X, 
-  			   const double& m ) :
+			  const double& m ) :
       U(G), src(X), mass(m) { };
     
     void operator() ( FermionField& dest, const Point& n) {
@@ -1852,7 +1523,7 @@ private:
     static const int n_cb = 0;
     
     WilsonKernel(const Field_t& G, const FermionField& X, 
-  			   const double& m ) :
+		 const double& m ) :
       U(G), src(X), mass(m) { };
     
     void operator() ( FermionField& dest, const Point& n) {
@@ -1991,7 +1662,7 @@ private:
     static const int n_cb = 0;
     
     Wilson5Kernel(const Field_t& G, const FermionField& X, 
-  			   const double& m ) :
+		  const double& m ) :
       U(G), src(X), mass(m) { };
     
     void operator() ( FermionField& dest, const Point& n) {

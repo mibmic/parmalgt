@@ -12,13 +12,9 @@
 #include <IO.hpp>
 #include <Methods.hpp>
 #include <Kernels/generic/Plaquette.hpp>
-#ifdef _OPENMP
-#include <omp.h>
-#else
-#include <time.h>
-#endif
 #include <signal.h>
 #include <util.hpp>
+#include <Timer.hpp>
 
 #ifdef USE_MPI
 #include <mpi.h>
@@ -38,7 +34,7 @@ const int DIM = 4;
 // perturbative order
 const int ORD = 4;
 // gauge improvement coefficient c1
-const double c_1 =  -0.331;
+const double c_1 =  0.0;
 
 ////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////
@@ -59,8 +55,8 @@ double taug;
 double alpha;
 
 // some short-hands
-// typedef bgf::ScalarBgf Bgf_t; // background field
-typedef bgf::AbelianBgf Bgf_t; // background field
+typedef bgf::ScalarBgf Bgf_t; // background field
+//typedef bgf::TrivialBgf Bgf_t; // background field
 typedef BGptSU3<Bgf_t, ORD> ptSU3; // group variables
 typedef ptt::PtMatrix<ORD> ptsu3; // algebra variables
 typedef BGptGluon<Bgf_t, ORD, DIM> ptGluon; // gluon
@@ -77,19 +73,10 @@ typedef GluonField::neighbors_t nt;
 //
 
 // ... for the gauge update/fixing ...
-#ifdef IMP_ACT // do we want an improved aciton?
-// 1x1, and 2x1 staples
-typedef kernels::StapleReKernel<GluonField> StK;
-// we need these to implement the imrovement at the boundary
-// NOTE however, that they have to be applied at t=1 and T=t-1
-typedef kernels::LWProcessA<GluonField> PrAK;
-typedef kernels::LWProcessB<GluonField> PrBK;
-typedef kernels::TrivialPreProcess<GluonField> PrTK;
-// workaround for template typedef
-template <class PR> struct GUK {
-  typedef  kernels::GaugeUpdateKernel <GluonField, StK, PR> type;
-};
-#endif
+
+typedef kernels::StapleSqKernel<GluonField> StSqK;
+typedef kernels::StapleReKernel<GluonField> StReK;
+
 typedef kernels::ZeroModeSubtractionKernel<GluonField> ZeroModeSubtractionKernel;
 
 // ... to set the background field ...
@@ -97,10 +84,10 @@ typedef kernels::SetBgfKernel<GluonField> SetBgfKernel;
 
 // ... and for the measurements ...
 typedef kernels::MeasureNormKernel<GluonField> MeasureNormKernel;
-typedef kernels::GammaUpperKernel<GluonField, kernels::init_helper_gamma> GammaUpperKernel;
-typedef kernels::GammaLowerKernel<GluonField, kernels::init_helper_gamma> GammaLowerKernel;
-typedef kernels::GammaUpperKernel<GluonField, kernels::init_helper_vbar> VbarUpperKernel;
-typedef kernels::GammaLowerKernel<GluonField, kernels::init_helper_vbar> VbarLowerKernel;
+// typedef kernels::GammaUpperKernel<GluonField, kernels::init_helper_gamma> GammaUpperKernel;
+// typedef kernels::GammaLowerKernel<GluonField, kernels::init_helper_gamma> GammaLowerKernel;
+// typedef kernels::GammaUpperKernel<GluonField, kernels::init_helper_vbar> VbarUpperKernel;
+// typedef kernels::GammaLowerKernel<GluonField, kernels::init_helper_vbar> VbarLowerKernel;
 typedef kernels::UdagUKernel<GluonField> UdagUKernel;
 typedef kernels::PlaqKernel<GluonField> PlaqKernel;
 
@@ -117,50 +104,12 @@ void measure_common(GluonField &U, const std::string& rep_str){
   array_t<double, ORD+1>::Type other;
   io::write_file(U.apply_everywhere(m).reduce(other),
                  "Norm" + rep_str + ".bindat");
+  PlaqKernel P;
+  ptSU3 tmp = U.apply_everywhere(P).reduce()/U.vol();
+  io::write_file<ptSU3, ORD>(tmp, tmp.bgf().Tr() , "Plaq" + rep_str + ".bindat");
+  
 }
 
-// Stuff that makes sense only for an Abelian background field.
-void measure(GluonField &U, const std::string& rep_str,
-             const bgf::AbelianBgf&){
-
-  //PlaqKernel P;
-  //io::write_file(U.apply_everywhere(P).val, "Plaq" + rep_str + ".bindat");
-
-#ifndef IMP_ACT
-  GammaUpperKernel Gu(L);
-  GammaLowerKernel Gl(L);
-#else
-  GammaUpperKernel::weights imp_coeff;
-  imp_coeff[0] = 1. - 8.*c_1;
-  imp_coeff[1] = c_1;
-  GammaUpperKernel Gu(L,imp_coeff);
-  GammaLowerKernel Gl(L,imp_coeff);
-#endif
-
-  //  Evaluate Gamma'
-  ptSU3 tmp = U.apply_on_timeslice(Gu, T-1).val
-    + U.apply_on_timeslice(Gl, 0).val;
-  io::write_file<ptSU3, ORD>(tmp, tmp.bgf().Tr() ,
-                             "Gp" + rep_str + ".bindat");
-  std::vector<Cplx> Gp(ORD+1);
-  Gp[0] = tmp.bgf().Tr();
-  for (int i = 1; i <= ORD; ++i)
-    Gp[i] = tmp[i-1].tr();
-  // the action at the boundary for the c_t counter-term
-  plaq::Temporal<GluonField> pt;
-  U.apply_on_timeslice(pt, 0);
-  U.apply_on_timeslice(pt, T-1).reduce();
-  io::write_file(pt.result, "B.bindat");
-  measure_common(U, rep_str);
-
-  // Evaluate vbar
-  VbarUpperKernel Vu(L);
-  VbarLowerKernel Vl(L);
-  tmp = U.apply_on_timeslice(Vu, T-1).val
-    + U.apply_on_timeslice(Vl, 0).val;
-  io::write_file<ptSU3, ORD>(tmp, tmp.bgf().Tr() , "Vbar" + rep_str + ".bindat");
-
-}
 
 // Stuff that makes sense only for a scalar background field.
 void measure(GluonField &U, const std::string& rep_str,
@@ -168,32 +117,6 @@ void measure(GluonField &U, const std::string& rep_str,
   measure_common(U, rep_str);
 }
 
-// timing
-
-struct Timer {
-  double t, tmp;
-  static double t_tot;
-  Timer () : t(0.0) { };
-  void start() { 
-#ifdef _OPENMP
-    tmp = omp_get_wtime(); 
-#else
-    tmp = clock();
-#endif
-
-  }
-  void stop() { 
-#ifdef _OPENMP
-    double elapsed = omp_get_wtime() - tmp; 
-#else
-    double elapsed = ((double)(clock() - tmp))/CLOCKS_PER_SEC;
-#endif
-    t += elapsed;
-    t_tot += elapsed;
-  }
-};
-
-double Timer::t_tot = 0.0;
 
 // helper function to feed int, double etc. to the parameters
 template <typename T> 
@@ -243,7 +166,7 @@ int main(int argc, char *argv[]) {
   taug = atof(p["taug"].c_str());
   NRUN = atoi(p["NRUN"].c_str());
   MEAS_FREQ = atoi(p["MEAS_FREQ"].c_str());
-  T = L-s;
+  T = L-s; // anisotropic lattice
   ////////////////////////////////////////////////////////////////////
   //
   // timing stuff
@@ -253,17 +176,6 @@ int main(int argc, char *argv[]) {
   //
   // random number generators
   srand(atoi(p["seed"].c_str()));
-#ifdef IMP_ACT
-  GUK<PrAK>::type::rands.resize(L*L*L*(T+1));
-  GUK<PrBK>::type::rands.resize(L*L*L*(T+1));
-  GUK<PrTK>::type::rands.resize(L*L*L*(T+1));
-  for (int i = 0; i < L*L*L*(T+1); ++i){
-    GUK<PrAK>::type::rands[i].init(rand());
-    GUK<PrBK>::type::rands[i].init(rand());
-    GUK<PrTK>::type::rands[i].init(rand());
-  }
-#endif
-
 
   ////////////////////////////////////////////////////////////////////
   //
@@ -275,10 +187,10 @@ int main(int argc, char *argv[]) {
 #ifdef USE_MPI
   e[DIM-1] = L/comm::Communicator<GluonField>::numprocs_ + 2;
 #endif
-  // for SF boundary: set the time extend to T + 1
-  e[0] = T + 1;
+
+  e[0] = T;
   // initialize background field get method
-  bgf::get_abelian_bgf(0, 0, T, L, s);
+  //  bgf::get_abelian_bgf(0, 0, T, L, s);
   // we will have just one field
   GluonField U(e, 1, 0, nt());
   // U.comm.init(argc,argv);
@@ -308,47 +220,15 @@ int main(int argc, char *argv[]) {
     ////////////////////////////////////////////////////////
     //
     //  gauge update
+    timings["Gauge Update"].start();
+    meth::gu::RK2_update<GluonField, StSqK>(U, taug);
+    timings["Gauge Update"].stop();
 
-#ifdef IMP_ACT
-    // In the case of an improved gauge action, we proceed with the
-    // update according to choice "B" in Aoki et al., hep-lat/9808007
-    // make vector of 'tirvially' pre-processed gauge update kernels
-    std::vector<GUK<PrTK>::type> gut;
-    for (Direction mu; mu.is_good(); ++mu)
-      gut.push_back(GUK<PrTK>::type(mu, taug));
-    timings["Gauge Update"].start();
-    // 1) Use 'special' GU kernels for spatial plaquettes at t=1 and
-    //    T-1, re reason for this is that the rectangular plaquettes
-    //    with two links on the boundary have a weight of 3/2 c_1.
-    for (Direction k(1); k.is_good(); ++k){
-      GUK<PrAK>::type gua (k, taug);
-      GUK<PrBK>::type gub (k, taug);
-      U.apply_on_timeslice(gua, 1);
-      U.apply_on_timeslice(gub, T-1);
-    }
-    // 2) Business as usual for t = 2,...,T-2, all directions and 
-    //    t = 0,1 and T-1 for mu = 0
-    for (int t = 2; t <= T-2; ++t)
-      for (Direction mu; mu.is_good(); ++mu)
-        U.apply_on_timeslice(gut[mu], t);
-    U.apply_on_timeslice(gut[0], 0);
-    U.apply_on_timeslice(gut[0], 1);
-    U.apply_on_timeslice(gut[0], T-1);
-    timings["Gauge Update"].stop();
-#else
-    timings["Gauge Update"].start();
-    //meth::gu::RK2_update<GluonField, false>(U, taug);
-    // DH: Experimental: gauge update using c_t^(1)
-    // DH: Comment the line above and uncomment the one
-    // DH: below to activate.
-    meth::gu::RK2_update<GluonField, true>(U, taug);
-    timings["Gauge Update"].stop();
-#endif
     ////////////////////////////////////////////////////////
     //
     //  gauge fixing
     timings["Gauge Fixing"].start();
-    meth::gf::sf_gauge_fixing(U, alpha);
+    meth::gf::gauge_fixing(U, alpha);
     timings["Gauge Fixing"].stop();
 
   } // end main for loop
