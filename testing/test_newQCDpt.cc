@@ -12,12 +12,10 @@ typedef ptt::PtMatrix<MYORD> ptsu3;
 typedef BGptGluon<bgf::AbelianBgf, MYORD, 4> ptGluon;
 //typedef BGptSpinColor<MYORD, 4> ptSpinColor;
 
-MyRand r(23797);
-
 int L = std::rand() % 100;
 int T = std::rand() % 100;
-double eta = r.Rand();
-double nu = r.Rand();
+double eta = std::rand()/static_cast<double>(RAND_MAX);
+double nu = std::rand()/static_cast<double>(RAND_MAX);
 // initialize the background field
 
 
@@ -85,8 +83,10 @@ TEST_F(AbelianBgfTest, Add){
 // Testing the scalar multiplicatiohn
 
 TEST_F(AbelianBgfTest, ScalarMultiply){
-  Cplx alpha(r.Rand(), r.Rand());
-  Cplx beta(r.Rand(), r.Rand());
+  Cplx alpha(std::rand()/static_cast<double>(RAND_MAX),
+	     std::rand()/static_cast<double>(RAND_MAX));
+  Cplx beta(std::rand()/static_cast<double>(RAND_MAX),
+	    std::rand()/static_cast<double>(RAND_MAX));
   ptSU3 beta_B = MyPtSU3B;
   beta_B *= beta;
   for (int i = 0; i < MYORD; ++i){

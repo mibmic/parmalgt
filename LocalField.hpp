@@ -221,6 +221,9 @@ namespace fields {
     pt::Point<DIM> mk_point(const raw_pt& n){
       return g.mk_point(n);
     }
+    raw_pt coords(const Point& n){
+      return g.coords(n);
+    }
 
     template <class M>
     M& apply_on_timeslice(M& f, const int& t){

@@ -247,7 +247,7 @@ namespace ptt {
     PtMatrix<N> result;
     static ranlxd::Rand r(1235431);
 #ifdef HAVE_STDCXX_0X
-    for (auto& e : result) { e = SU3rand(r); }
+    for (auto& e : result) { e = sun::SU3rand(r); }
 #else
     for (int i = 0; i < N; ++i)
       result[i] = sun::SU3rand(r);

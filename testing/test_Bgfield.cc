@@ -7,14 +7,15 @@
 
 // With a nice base class ...
 
-MyRand r(23797);
+//MyRand r(23797);
 
 
 class CommonBgfTest {
 public:
   CommonBgfTest() {
-    for (int i = 0; i < 9; ++i)
-      A[i] = Cplx(r.Rand(), r.Rand());
+    std::for_each(A.begin(), A.end(),[](Cplx& i) { i=Cplx(rand(),rand());});
+    // for (int i = 0; i < 9; ++i)
+    //   A[i] = Cplx(rand(), rand());
   }
   SU3 A;
 };
@@ -23,9 +24,9 @@ class AbelianBgfTest : public CommonBgfTest, public ::testing::Test {
 public:
   AbelianBgfTest() {
     for (int i = 0; i < 3; ++i){
-      su3B[i*4] = Cplx(r.Rand(), r.Rand());
+      su3B[i*4] = Cplx(rand(), rand());
       bgfB[i] = su3B[i*4];
-      su3C[i*4] = Cplx(r.Rand(), r.Rand());
+      su3C[i*4] = Cplx(rand(), rand());
       bgfC[i] = su3C[i*4];
       su3One[i*4] = Cplx(1., 0.);
     }
@@ -63,8 +64,8 @@ TEST_F(AbelianBgfTest, BgfProduct){
 TEST_F(AbelianBgfTest, VectorProduct){
   CVector b, c, Bb, cC;
   for (int i = 0; i < 3; ++i){
-    c[i] =  Cplx(r.Rand(), r.Rand());
-    b[i] =  Cplx(r.Rand(), r.Rand());
+    c[i] =  Cplx(rand(), rand());
+    b[i] =  Cplx(rand(), rand());
   }
   cC = bgfC.ApplyFromRight(c);
   Bb = bgfB.ApplyFromLeft(b);
@@ -78,7 +79,7 @@ TEST_F(AbelianBgfTest, VectorProduct){
 }
 
 TEST_F(AbelianBgfTest, CplxProduct){
-  Cplx alpha(r.Rand(), r.Rand());
+  Cplx alpha(rand(), rand());
   SU3 D = (bgfB*alpha).ApplyFromLeft(su3One);
   ASSERT_TRUE( SU3Cmp(D, su3B*alpha)() );
 }
@@ -131,7 +132,7 @@ TEST(AbelianBgf, KnownValues){
     // initialize the background field
     bgf::AbelianBgfFactory factory(T, L);
     // random x0
-    int x0 = r.Rand()*T;
+    int x0 = rand()/static_cast<double>(RAND_MAX)*T;
     // now calculate 
     //       exp (i E t) = dV
     //           = exp ( - i gamma * x0 * diag(2,-1,-1) )

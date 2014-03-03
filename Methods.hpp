@@ -6,6 +6,8 @@
 #include <LocalField.hpp>
 #include <Kernels/generic/RungeKutta.hpp>
 
+#include <fft.hpp>
+
 namespace meth{
 
   namespace gf {
@@ -159,6 +161,7 @@ namespace meth{
 	//  \author    Dirk Hesse <dirk.hesse@fis.unipr.it>
 	RandField& operator[](int k){ return R[k]; }
       };
+
       
     }
     ////////////////////////////////////////////////////////////
@@ -260,6 +263,141 @@ namespace meth{
       }
     }
   } // namespace::gu
+
+  namespace fu {
+
+      ////////////////////////////////////////////////////////////
+      //
+      //  Generate random SpinColor (3) fields. 
+      //
+      //  \warning   THE RANLUX VERISON IS NOT VERY WELL TESTED
+      //  \tparam    Fld_t ScalarFermionField field type to be used.
+      //  \author Michele Brambilla <mib.mic@gmail.com>
+      //  \date Wed Jan 15 10:46:04 2014
+      template <class Fld_t>
+      struct gaussian_source {
+      	typedef typename kernels::base_types<Fld_t>::data_t data_t;
+      	static const int DIM = kernels::base_types<Fld_t>::n_dim;
+
+      	typedef kernels::RCVKernel<Fld_t> RandKernel;
+      	typedef typename Fld_t::neighbors_t nt;
+      	std::vector<Fld_t> R;
+      	int L, T;
+
+      	gaussian_source(const Fld_t& U) : T(U.extent(0)),
+      				    L(U.extent(1)) {
+      	  //*/
+      	  // Using RANLUX
+      	  long vol = (L*L*L*T);
+      	  std::vector<int> seeds(vol);
+      	  for (long i = 0; i < vol; ++i)
+      	    seeds[i] = rand();
+      	  RandKernel::rands = typename RandKernel::rand_vec_t(seeds.begin(), seeds.end());
+      	  for (int k = 0; k < DIM; ++k)
+      	    R.push_back(Fld_t(U.extents(), 1, 0, nt()));
+      	}
+      	////////////////////////////////////////////////////////////
+      	//
+      	//  Fill the Fields with new random numbers. This should be
+      	//  called before each update.
+      	//
+      	//  \date      Thu Feb 21 18:20:29 2013
+      	//  \author    Dirk Hesse <dirk.hesse@fis.unipr.it>
+      	void update() {
+      	  R[0].apply_everywhere(RandKernel());
+      	}
+      	////////////////////////////////////////////////////////////
+      	//
+      	//  Access the random SU(3) field associated with a given
+      	//  direction.
+      	//
+      	//  \date      Thu Feb 21 18:22:06 2013
+      	//  \author    Dirk Hesse <dirk.hesse@fis.unipr.it>
+      	Fld_t& operator()(){ return R[0]; }
+      };
+
+      // ////////////////////////////////////////////////////////////
+      // //
+      // //  Generate random SpinColor (3) fields. 
+      // //
+      // //  \warning   THE RANLUX VERISON IS NOT VERY WELL TESTED
+      // //  \tparam    Fld_t ScalarFermionField field type to be used.
+      // //  \author Michele Brambilla <mib.mic@gmail.com>
+      // //  \date Wed Jan 15 10:46:04 2014
+      // template <class Fld_t>
+      // struct gaussian_source {
+      // 	typedef typename kernels::base_types<Fld_t>::data_t data_t;
+      // 	static const int DIM = kernels::base_types<Fld_t>::n_dim;
+      // 	typedef kernels::RCVKernel<Fld_t> RandKernel;
+      // 	int L,T;
+      // 	Fld_t& F; 
+
+      // 	gaussian_source(Fld_t& U) : T(U.extent(0)),
+      // 				    L(U.extent(1)),
+      // 				    F(U) {
+      // 	  long vol = (L*L*L*T);
+      // 	  std::vector<int> seeds(vol);
+      // 	  for (long i = 0; i < vol; ++i)
+      // 	    seeds[i] = rand();
+      // 	  RandKernel::rands = typename RandKernel::rand_vec_t(seeds.begin(), seeds.end());
+      // 	}
+      // 	////////////////////////////////////////////////////////////
+      // 	//
+      // 	//  Fill the Fields with new random numbers. This should be
+      // 	//  called before each update.
+      // 	//
+      // 	//  \date      Thu Feb 21 18:20:29 2013
+      // 	//  \author    Dirk Hesse <dirk.hesse@fis.unipr.it>
+      // 	void update() {
+      // 	  F.apply_everywhere(RandKernel());
+      // 	}
+      // };
+
+    
+    template <class Gauge_t, class Fld_t, int boundary>
+    void invert(const Gauge_t& U, Fld_t& src, std::vector<Fld_t>& dest, 
+		const std::vector<double>& mass) {
+      const int ORD = kernels::base_types<Gauge_t>::order;
+      int oo = 0;
+      
+      typename Fld_t::data_t zm;
+      std::for_each(src.begin(),src.end(), 
+       		    [&](const typename Fld_t::data_t& i) { zm+=i; });
+      zm /= U.vol();
+      std::for_each(src.begin(),src.end(), 
+       		    [&](typename Fld_t::data_t& i) { i -= zm; });
+
+      fft::fft<Fld_t,fft::pbc> ft(dest[0]);
+      for(oo=1;oo<ORD-1;++oo)
+	dest[oo].apply_everywhere(fields::detail::inplace_smul<Fld_t,double>(0.));
+
+      dest[0]=src;
+
+      const double m = 0;
+      kernels::WilsonPropagator<Fld_t,boundary> wp(dest[0],m);
+      ft.execute(fft::x2p);
+      dest[0].apply_everywhere(wp);
+      ft.execute(fft::p2x);
+      std::for_each(dest[0].begin(),dest[0].end(), 
+      		    [](const typename Fld_t::data_t& i) { std::cout << i;  });
+
+
+      kernels::PTWilsonKernel<Gauge_t,kernels::detail::NoBdy> wk(U,dest,mass,oo);
+
+      for(oo=1;oo<ORD-1;++oo) {
+      	dest[oo].apply_everywhere(wk);
+	ft.execute(dest[oo],dest[oo],fft::x2p);
+	dest[oo].apply_everywhere(wp);
+	ft.execute(dest[oo],dest[oo],fft::p2x);
+	dest[oo].apply_everywhere(fields::detail::inplace_smul<Fld_t,double>(-1.));
+      }
+
+      // std::for_each(dest[1].begin(),dest[1].end(), 
+      // 		    [](const typename Fld_t::data_t& i) { std::cout << i;  });
+
+    }
+  } // namespace::fu
+
 } // namespace::meth
 
 #endif
