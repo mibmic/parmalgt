@@ -252,10 +252,10 @@ int main(int argc, char *argv[]) {
   }
 
   meth::fu::invert<GluonField,ScalarFermionField,0>(U,Xi,Psi,mass);
-  meth::fu::invert<GluonField,ScalarFermionField,0>(U,Xi,Psi,mass);
-  meth::fu::invert<GluonField,ScalarFermionField,0>(U,Xi,Psi,mass);
-  std::for_each(Psi[2].begin(),Psi[2].end(), 
-   		[](const ScalarFermionField::data_t& i) { std::cout << i;  });
+  // meth::fu::invert<GluonField,ScalarFermionField,0>(U,Xi,Psi,mass);
+  // meth::fu::invert<GluonField,ScalarFermionField,0>(U,Xi,Psi,mass);
+  // std::for_each(Psi[2].begin(),Psi[2].end(), 
+  //  		[](const ScalarFermionField::data_t& i) { std::cout << i;  });
   
   std::vector<kernels::FermionicUpdateKernel<GluonField,ScalarFermionField> > fk;
   for(Direction mu(0);mu.is_good();++mu)
@@ -263,6 +263,8 @@ int main(int argc, char *argv[]) {
 
   for(Direction mu(0);mu.is_good();++mu)
     U.apply_everywhere(fk[mu]);
+  std::for_each(U.begin(),U.end(), 
+    		[](const GluonField::data_t& i) { std::cout << i[0];  });
 
   return 0;
 }

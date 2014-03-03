@@ -1479,7 +1479,7 @@ namespace kernels {
 
     WilsonPropagator(Field_t& other, const double m) : 
       mbare(m), ext(other.extents()), 
-      k({2.0*M_PI/ext[0],2.0*M_PI/ext[1],2.0*M_PI/ext[2],2.0*M_PI/ext[3]}), p(DIM) { }
+      k({2.0*M_PI/ext[0],2.0*M_PI/ext[1],2.0*M_PI/ext[2],2.0*M_PI/ext[3]}) { }
     
 
     void operator() (Field_t& dest, const Point& n) {
@@ -1490,30 +1490,31 @@ namespace kernels {
     const double mbare;
     const extents_t ext;
     const array_t k;
-    array_t p;
 
     template <int M> struct mode_selektor { };
 
     void do_it(Field_t& dest, const Point& n,mode_selektor<0>) {
+      array_t p(DIM);
       if( int(n) != 0) {
 	raw_pt x = dest.coords(n);
 	for( Direction mu(0); mu.is_good(); ++mu )
 	  p[int(mu)] = k[int(mu)]*x[int(mu)];
-	propagator(dest[n]);
+	propagator(dest[n],p);
       }
       else
 	dest[n] *= 0;
     }
 
     void do_it(Field_t& dest, const Point& n,mode_selektor<1>) {
+      array_t p(DIM);
       raw_pt x = dest.coords(n);
       p[0] = k[0]*(x[0]+.5);
       for( Direction mu(1); mu.is_good(); ++mu )
 	p[int(mu)] = k[int(mu)]*x[int(mu)];
-      propagator(dest[n]);
+      propagator(dest[n],p);
     }
 
-    void propagator(data_t& result) {
+    void propagator(data_t& result, const array_t& p) {
       array_t pb(std::sin(p));
       array_t p2hat(std::pow(2*std::sin(.5*p),2));
       double M = mbare + .5*p2hat.sum();

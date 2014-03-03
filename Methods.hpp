@@ -367,19 +367,22 @@ namespace meth{
       std::for_each(src.begin(),src.end(), 
        		    [&](typename Fld_t::data_t& i) { i -= zm; });
 
-      fft::fft<Fld_t,fft::pbc> ft(dest[0]);
+      static fft::fft<Fld_t,fft::pbc> ft(dest[0]);
       for(oo=1;oo<ORD-1;++oo)
 	dest[oo].apply_everywhere(fields::detail::inplace_smul<Fld_t,double>(0.));
 
       dest[0]=src;
 
+      // std::for_each(dest[0].begin(),dest[0].end(), 
+      // 		    [](const typename Fld_t::data_t& i) { std::cout << i;  });
+
       const double m = 0;
       kernels::WilsonPropagator<Fld_t,boundary> wp(dest[0],m);
-      ft.execute(fft::x2p);
+      ft.execute(dest[0],dest[0],fft::x2p);
       dest[0].apply_everywhere(wp);
-      ft.execute(fft::p2x);
-      std::for_each(dest[0].begin(),dest[0].end(), 
-      		    [](const typename Fld_t::data_t& i) { std::cout << i;  });
+      ft.execute(dest[0],dest[0],fft::p2x);
+      // std::for_each(dest[0].begin(),dest[0].end(), 
+      // 		    [](const typename Fld_t::data_t& i) { std::cout << i;  });
 
 
       kernels::PTWilsonKernel<Gauge_t,kernels::detail::NoBdy> wk(U,dest,mass,oo);
