@@ -535,7 +535,7 @@ public:
   typedef typename array_t::iterator iterator;
   typedef typename array_t::const_iterator const_iterator;
 
-  static const int storage_size = DIM*pt_su3_t::storage_size + BGF::storage_size;
+  static const int storage_size = DIM*pt_su3_t::storage_size;
  
   // access
   pt_su3_t& operator[](const int& i){ return U_[i]; }

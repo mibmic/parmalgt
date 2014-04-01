@@ -124,29 +124,27 @@ void invertQ( const ScalarFermionField& src, GluonField& U, FermionField& dest )
   
   std::cout << "#Fermion Operator Inversion" << std::endl;
 
-  double m = .01;
+  double m = .1;
   ScalarFermionField Mxi (src);
   meth::Dirac<GluonField,ScalarFermionField,
-  	      kernels::WilsonTreeLevel5Kernel> applyD(src,U,m);
+  	      kernels::TreeLevelWilsonKernel> applyD(src,U,m);
 
   applyD(Mxi);
-  double tol = 1e-5;
+  double tol = 1e-10;
 
   if( inverter::BiCGstab<GluonField, ScalarFermionField, 
-  		    kernels::WilsonTreeLevel5Kernel, COUNT_MAX>( U, Mxi, dest[0], m, tol ) )
-    {
-      std::cout << "#Error: unable to converge in less than " 
-		<< COUNT_MAX 
-		<< " iterations." 
-		<< std::endl;
-    }
+      kernels::TreeLevelWilsonKernel, COUNT_MAX>(U,Mxi,dest[0],m,tol)){
+    std::cout << "#Error: unable to converge in less than " 
+	      << COUNT_MAX 
+	      << " iterations." 
+	      << std::endl;
+  }
   if( inverter::cgs<GluonField, ScalarFermionField, 
-  		    kernels::WilsonTreeLevel5Kernel,COUNT_MAX>( U, Mxi, dest[1], m, tol ) )
-    {
-      std::cout << "#Error: unable to converge in less than " 
-		<< COUNT_MAX 
-		<< " iterations." 
-		<< std::endl;
+      kernels::TreeLevelWilsonKernel,COUNT_MAX>(U,Mxi,dest[1],m,tol)) {
+    std::cout << "#Error: unable to converge in less than " 
+	      << COUNT_MAX 
+	      << " iterations." 
+	      << std::endl;
     }
   
 }

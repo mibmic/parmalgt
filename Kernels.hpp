@@ -772,7 +772,7 @@ namespace kernels {
 
     // This may NOT be executed in parallel, so ...
     typedef void NoPar;
-    
+
     // iterator to the positon where the next write goes
     OutputIterator oi;
     
@@ -791,14 +791,15 @@ namespace kernels {
 
     // This may NOT be executed in parallel, so ...
     typedef void NoPar;
-    
+
     // iterator to the positon where the next write goes
     InputIterator ii;
     
     Unbuffer(InputIterator i) : ii(i) { }
 
     void operator()(Field_t& U, const point_t& n){
-      U[n] = *(ii++);
+      U[n].unbuffer(ii++);
+      //      U[n] = *(ii++);
     }
   };
 
@@ -1157,142 +1158,7 @@ namespace kernels {
   };
 #endif
 
-
-  //////////////////////////////////////////////////////////////////////
-  //////////////////////////////////////////////////////////////////////
-  ///
-  ///  Writing a gluon to a file.
-  ///
-  ///  \author Dirk Hesse <herr.dirk.hesse@gmail.com>
-  ///  \date Fri May 25 15:59:06 2012
-
-  template <class Field_t>
-  class FileWriterKernel {
-  public:
-    // collect info about the field
-    typedef typename std_types<Field_t>::ptGluon_t ptGluon;
-    typedef typename std_types<Field_t>::ptSU3_t ptSU3;
-    typedef typename std_types<Field_t>::ptsu3_t ptsu3;
-    typedef typename std_types<Field_t>::bgf_t BGF;
-    typedef typename std_types<Field_t>::point_t Point;
-    typedef typename std_types<Field_t>::direction_t Direction;
-    static const int ORD = std_types<Field_t>::order;
-    static const int DIM = std_types<Field_t>::n_dim;
-
-    // This may NOT be executed in parallel, so ...
-    typedef void NoPar;
-
-    explicit FileWriterKernel (uparam::Param& p) : o(p) { }
-
-    void operator()(Field_t& U, const Point& n){
-      for (Direction mu(0); mu.is_good(); ++mu)
-#pragma omp critical
-        U[n][mu].write(o);
-    }
-    io::CheckedOut o;
-  private:
-    // make n_cb private to prevent parallel application of this
-    // kernel, because this would be a terrible idea
-    static const int n_cb = 0;
-  };
   
-  //////////////////////////////////////////////////////////////////////
-  //////////////////////////////////////////////////////////////////////
-  ///
-  ///  Reading a gluon from a file.
-  ///
-  ///  \author Dirk Hesse <herr.dirk.hesse@gmail.com>
-  ///  \date Wed May 30 18:37:03 2012
-
-  template <class Field_t>
-  struct FileReaderKernel {
-  public:
-    // collect info about the field
-    typedef typename std_types<Field_t>::ptGluon_t ptGluon;
-    typedef typename std_types<Field_t>::ptSU3_t ptSU3;
-    typedef typename std_types<Field_t>::ptsu3_t ptsu3;
-    typedef typename std_types<Field_t>::bgf_t BGF;
-    typedef typename std_types<Field_t>::point_t Point;
-    typedef typename std_types<Field_t>::direction_t Direction;
-    static const int ORD = std_types<Field_t>::order;
-    static const int DIM = std_types<Field_t>::n_dim;
-
-    // This may NOT be executed in parallel, so ...
-    typedef void NoPar;
-
-    explicit FileReaderKernel (uparam::Param& p) : i(p) { }
-
-    void operator()(Field_t& U, const Point& n){
-      for (Direction mu(0); mu.is_good(); ++mu)
-        U[n][mu].read(i);
-    }
-    io::CheckedIn i;
-  private:
-    // make n_cb private to prevent parallel application of this
-    // kernel, because this would be a terrible idea
-    static const int n_cb = 0;
-  };
-
-
-
-  //////////////////////////////////////////////////////////////////////
-  //////////////////////////////////////////////////////////////////////
-  ///
-  ///  Reading a gluon from a file.
-  ///
-  ///  \author Dirk Hesse <herr.dirk.hesse@gmail.com>
-  ///  \date Wed May 30 18:37:03 2012
-
-  template <class Field_t>
-  struct PRlgtReaderKernel {
-  public:
-    // collect info about the field
-    typedef typename std_types<Field_t>::ptGluon_t ptGluon;
-    typedef typename std_types<Field_t>::ptSU3_t ptSU3;
-    typedef typename std_types<Field_t>::ptsu3_t ptsu3;
-    typedef typename std_types<Field_t>::bgf_t BGF;
-    typedef typename std_types<Field_t>::point_t Point;
-    typedef typename std_types<Field_t>::direction_t Direction;
-    static const int ORD = std_types<Field_t>::order;
-    static const int DIM = std_types<Field_t>::n_dim;
-    static const int SIZE = 2 + ptSU3::storage_size;
-    typename array_t<double,SIZE>::Type data;
-
-    // This may NOT be executed in parallel, so ...
-    typedef void NoPar;
-
-    explicit PRlgtReaderKernel (std::ifstream& in) : is(in) { }
-
-    void operator()(Field_t& U, const Point& n){
-      SU3 t;
-      for(Direction mu(0); mu.is_good(); ++mu) {
-	is.read((char*)(&data[0]),(SIZE*sizeof(double))/sizeof(char) );
-	for(int o=o;o<ORD;++o) {
-	  for(int a=0;a<9;++a)
-	    t[a]=data[a+ORD*o];
-	  U[n][mu][o] = t;
-	}
-
-	// std::cout <<  U[n][mu].bgf() << std::endl;
-	// // for(int b=0;b<3;++b)
-	// //   for(int a=0;a<3;++a)
-	// std::cout << U[n][mu][0] << std::endl << std::endl;
-
-      } // Direction
-
-      // int l;
-      // std::cin >> l;
-    }
-
-  private:
-    // make n_cb private to prevent parallel application of this
-    // kernel, because this would be a terrible idea
-    static const int n_cb = 0;
-    std::ifstream& is;
-  };
-
-
-
 
   namespace detail {
 
@@ -1364,6 +1230,12 @@ namespace kernels {
       typename std_types<Gauge_t>::ptSU3_t d = dag(U[n-mu][mu]);
       return helper::add(d[ord]*Xi1,U[n ][mu][ord]*Xi2,bdy());
     }
+
+    // se le due precedenti le unisco usando fino al return una sola
+    // policy che ritorna ad es un pair<F> e solo l'invocazione del
+    // return resta specializzata?
+
+
   }
 
 
@@ -1537,65 +1409,6 @@ namespace kernels {
 
   
   
-  ////////////////////////////////////////////////////////////////////////
-  ////////////////////////////////////////////////////////////////////////
-  /////
-  /////  Perturbative application of the staggered dirac operator
-  /////  
-  /////
-  /////  \author Michele Brambilla <mib.mic@gmail.com>
-  /////  \date Fri Nov 02 16:23:46 2012
-  //
-  //template <class Field_t>
-  //struct StaggeredPTKernel {
-  //  // collect info about the field
-  //  typedef typename std_types<Field_t>::ptGluon_t ptGluon;
-  //  typedef typename std_types<Field_t>::ptSU3_t ptSU3;
-  //  typedef typename std_types<Field_t>::ptsu3_t ptsu3;
-  //  typedef typename std_types<Field_t>::bgf_t BGF;
-  //  typedef typename std_types<Field_t>::point_t Point;
-  //  typedef typename std_types<Field_t>::direction_t Direction;
-  //  static const int ORD = std_types<Field_t>::order;
-  //  static const int DIM = std_types<Field_t>::n_dim;
-  //
-  //  // fermion
-  //  typedef SpinColor<1> Fermion;
-  //  typedef fields::LocalField<Fermion, DIM> FermionField;
-  //  typedef typename array_t<double, DIM>::Type double_array_t;    
-  //  
-  //  // checker board hyper cube size
-  //  // c.f. geometry and localfield for more info
-  //  static const int n_cb = 0;
-  //
-  //
-  //
-  //  StaggeredPTKernel( Field_t& G, FermionField& X, const double& m ) : U(G), src(X), mass(m) { Uorder = 0; std::cout << "Fix eta definition!!!!!\n";};
-  //  
-  //  void eta(const Point& n, double_array_t& phase) {
-  //
-  //  }
-  //  
-  //  void next_Uorder() { Uorder++; }
-  //  void reset_Uorder() { Uorder = 0; }
-  //
-  //  void operator()( FermionField& dest, Point& n) {
-  //    eta(n, phase);
-  //    for( Direction nu(0); nu.is_good(); ++nu )
-  //	dest[n][0] += .5*phase[(int)nu] * ( U[n][nu][Uorder] * src[n+nu][0] - U[n-nu][nu][Uorder] * src[n-nu][0] );
-  //    //      mass
-  //    dest[n][0] += mass * src[n][0];
-  //
-  //  }
-  //
-  //private:
-  //  int Uorder;
-  //  double mass;
-  //  double_array_t phase;
-  //  Field_t& U;
-  //  FermionField& src;
-  //
-  //};
-
   template<class G, class F>
   struct FermionicUpdateKernel {
 
@@ -1603,11 +1416,10 @@ namespace kernels {
     typedef typename std_types<G>::bgf_t BGF;
     typedef typename std_types<G>::point_t Point;
     typedef typename std_types<G>::direction_t Direction;
+    typedef typename std_types<G>::ptsu3_t ptsu3;
     static const int ORD = std_types<G>::order;
     static const int DIM = std_types<G>::n_dim;
-    static const int Nc  = 3;//ptsu3::su3_array_t::C::N;
-    //    typedef BGptSU3<bgf::TrivialBgf, ORD> ptsu3;
-    typedef typename std_types<G>::ptsu3_t ptsu3;
+    static const int Nc  = ptsu3::su3_array_t::value_type::size;
 
     typedef typename base_types<F>::data_t Fermion;
 
@@ -1617,7 +1429,6 @@ namespace kernels {
     const std::vector<F>& psi;
     const Direction mu;
     const double tauf;
-
 
     FermionicUpdateKernel(F& Xi_,
 			  const std::vector<F>& Psi_, 
@@ -1630,22 +1441,16 @@ namespace kernels {
       int i;
       typename array_t<Fermion,ORD-1>::Type tmp;
 
-      for(int o=0;o<ORD-1;++o) {
-	for(Direction nu(0);nu.is_good();++nu) {
+      for(int o=0;o<ORD-1;++o)
+	for(Direction nu(0);nu.is_good();++nu)
       	  tmp[o][nu] = (psi[o][n][nu]+
       	  		psi[o][n][dirac::gmuind[mu][nu]]*dirac::gmuval[mu][nu]);
-	}
-      }
 
-      for(int o=0;o<ORD-1;++o) {
-      	for(int k=0;k<Nc;k++) {
-      	  for(int j=0;j<Nc;j++) {
-      	    for(Direction nu(0);nu.is_good();++nu) {
+      for(int o=0;o<ORD-1;++o)
+      	for(int k=0;k<Nc;k++)
+      	  for(int j=0;j<Nc;j++)
+      	    for(Direction nu(0);nu.is_good();++nu)
       	      W[o+1](k,j) += xi[n+mu][nu][j].conj() * tmp[o][nu][k];
-      	    }
-      	  }
-      	}
-      }
 
       W.bgf() *= 0;
       W1 = (W*dag(U[n][mu])).ptU();
@@ -1658,6 +1463,152 @@ namespace kernels {
       U[n][mu] = exp<BGF, ORD>(W1*tauf)*U[n][mu];
     }
   };
+
+
+
+  template <class Field_t, int boundary>
+  struct StaggeredPropagator {
+  public:
+    typedef typename base_types<Field_t>::data_t data_t; 
+    typedef typename base_types<Field_t>::point_t Point;
+    typedef typename base_types<Field_t>::direction_t Direction;
+    typedef typename Field_t::raw_pt raw_pt;
+    typedef typename Field_t::extents_t extents_t;
+    static const int DIM = base_types<Field_t>::n_dim;
+
+    typedef std::valarray<double> array_t;    
+    typedef std::valarray<int> iarray_t;    
+
+    // checker board hyper cube size
+    // c.f. geometry and localfield for more info
+    static const int n_cb = 0;
+
+    StaggeredPropagator(Field_t& other, const double m) : 
+      mbare(m), ext(other.extents()), 
+      k({2.0*M_PI/ext[0],2.0*M_PI/ext[1],2.0*M_PI/ext[2],2.0*M_PI/ext[3]}) { }
+    
+
+    void operator() (Field_t& dest, const Point& n) {
+      do_it(dest,n,mode_selektor<boundary>());
+    }
+
+  private:
+    const double mbare;
+    const extents_t ext;
+    const array_t k;
+
+    template <int M> struct mode_selektor { };
+
+    void do_it(Field_t& dest, const Point& n,mode_selektor<0>) {
+      array_t p(DIM);
+      if( int(n) != 0) {
+  	raw_pt x = dest.coords(n);
+  	for( Direction mu(0); mu.is_good(); ++mu )
+  	  p[int(mu)] = k[int(mu)]*x[int(mu)];
+  	propagator(dest[n],p,x);
+      }
+      else
+  	dest[n] *= 0;
+    }
+
+    void do_it(Field_t& dest, const Point& n,mode_selektor<1>) {
+      array_t p(DIM);
+      raw_pt x = dest.coords(n);
+      p[0] = k[0]*(x[0]+.5);
+      pt::MultiDir<DIM> m(ext/2,Direction(0));
+      Point l=n+m;
+      for( Direction mu(1); mu.is_good(); ++mu )
+  	p[int(mu)] = k[int(mu)]*x[int(mu)];
+      propagator(dest[n],p,x);
+    }
+
+    
+
+    void propagator(data_t& result, const array_t& p, const raw_pt& x) {
+      
+      // array_t p(DIM);
+      // array_t pb(std::sin(p));
+      // double den = 1./(mbare*mbare+std::inner_product(begin(pb),end(pb),begin(pb),0.0));
+      // data_t F(result*M);
+
+      // raw_pt alpha;
+      // for(int i=0;i<DIM;++i)
+      // 	alpha[i]=x[i]/(ext[i]/2);
+
+      // raw_pt beta(alpha);
+      // for(Direction mu(0); mu.is_good(); ++mu)
+	
+	
+
+      // 	  F[nu] -= ( dirac::gmuval[mu][nu] * result[dirac::gmuind[mu][nu]] *
+      // 		     Cplx(0.,pb[int(mu)]) );
+      // result = F*den;
+    }
+    
+  };
+
+  //////////////////////////////////////////////////////////////////////
+  ///
+  /// Staggered dirac operator --> puo' essere lo stesso di Wilson a
+  ///                              meno di invocare Gamma o Eta a
+  ///                              seconda del fermione?
+
+  template <class Field_t, class bdy>
+  struct PTStaggeredKernel : public base_types<Field_t> {
+  public:
+    // collect info about the field
+    typedef typename std_types<Field_t>::point_t Point;
+    typedef typename std_types<Field_t>::direction_t Direction;
+    static const int DIM = std_types<Field_t>::n_dim;
+    // fermion
+    typedef SpinColor<1> Fermion;
+    typedef typename fields::LocalField<Fermion, DIM> FermionField;
+
+    // checker board hyper cube size
+    static const int n_cb = 0;
+    
+    PTStaggeredKernel(const Field_t& G, const std::vector<FermionField>& F, 
+		      const std::vector<double>& m, int& oo ) :
+      U(G), src(F), mass(m), o(oo) { };
+    
+    void operator() ( FermionField& dest, const Point& n) {
+      
+      // if(int(n)==0)
+      // 	std::cout << "ord = " << o << std::endl;
+      //      dest[n] *= 0;
+      for( int kord = 0; kord < o; kord++) {
+	// if(int(n)==0)
+	//   std::cout << "\tmass[" << o-kord 
+	// 	    << "] = " << mass[o-kord]
+	// 	    << "\tsrc[" << kord
+	// 	    << "]=\n" << src[o-kord][n]
+	// 	    << std::endl;
+      	// critical mass
+      	dest[n] += src[kord][n]*mass[o-kord];
+      	// interaction
+      	for( Direction mu(1); mu.is_good(); ++mu )
+      	  dest[n] -= Gamma(U,src[kord],n,mu,o-kord-1,detail::NoBdy()) * .5; // here Eta(...)
+      	dest[n] -= Gamma(U,src[kord],n,Direction(0),o-kord-1,bdy()) * .5;   // same
+      } // kord
+      // if(int(n)==0)
+      // 	std::cout << std::endl;
+	  
+    }
+  
+  private:
+    
+    const std::vector<double>& mass;
+    const Field_t& U;
+    const std::vector<FermionField>& src;
+    const int& o;
+  };
+
+
+
+
+
+
+
 
 
 

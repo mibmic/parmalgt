@@ -8,6 +8,10 @@
 
 #include <fft.hpp>
 
+#include <fstream>
+#include <iterator>
+#include <type_traits>
+
 namespace meth{
 
   namespace gf {

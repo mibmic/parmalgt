@@ -11,8 +11,8 @@
 #include <stdlib.h>
 #include <IO.hpp>
 #include <Methods.hpp>
-#include <Kernels/generic/Plaquette.hpp>
-#include <Kernels/generic/IO.hpp>
+#include <include/Kernels/generic/Plaquette.hpp>
+#include <include/Kernels/generic/IO.hpp>
 #include <signal.h>
 #include <util.hpp>
 #include <Timer.hpp>
@@ -33,9 +33,12 @@ void kill_handler(int s){
 // space-time dimensions
 const int DIM = 4;
 // perturbative order
-const int ORD = 4;
+const int ORD = 6;
 // gauge improvement coefficient c1
-const double c_1 =  0.0;
+const double c_1 =  -0.331;
+// Number of fermion
+const int Nf = 4;
+
 
 ////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////
@@ -68,6 +71,11 @@ typedef pt::Direction<DIM> Direction;
 typedef fields::LocalField<ptGluon, DIM> GluonField;
 typedef GluonField::neighbors_t nt;
 
+// shorthand for fermion field
+typedef SpinColor<4> Fermion;
+typedef fields::LocalField< Fermion , DIM> ScalarFermionField;
+typedef std::vector<ScalarFermionField> FermionField;
+
 
 //
 // Make aliases for the Kernels ...
@@ -77,6 +85,7 @@ typedef GluonField::neighbors_t nt;
 
 typedef kernels::StapleSqKernel<GluonField> StSqK;
 typedef kernels::StapleReKernel<GluonField> StReK;
+typedef StReK StK;
 
 typedef kernels::ZeroModeSubtractionKernel<GluonField> ZeroModeSubtractionKernel;
 
@@ -95,6 +104,7 @@ typedef kernels::PlaqKernel<GluonField> PlaqKernel;
 // ... and for the checkpointing.
 typedef kernels::FileWriterKernel<GluonField> FileWriterKernel;
 typedef kernels::FileReaderKernel<GluonField> FileReaderKernel;
+typedef kernels::PRlgtReaderKernel<GluonField> PRlgtReaderKernel;
 
 // Our measurement...
 
@@ -129,11 +139,12 @@ std::string to_string(const T& x){
 
 
 int main(int argc, char *argv[]) {
+
 #ifdef IMP_ACT
-  //TODO: CROSS CHECK THESE
   StK::weights[0] = 1. - 8.*c_1;
   StK::weights[1] = c_1;
 #endif
+
   signal(SIGUSR1, kill_handler);
   signal(SIGUSR2, kill_handler);
   signal(SIGXCPU, kill_handler);
@@ -204,9 +215,25 @@ int main(int argc, char *argv[]) {
       U.apply_on_timeslice(f, t);
     }
   else {
-    FileReaderKernel fr(p);
+// #ifndef READ_FROM_PRLGT
+//     FileReaderKernel fr(p);
+// #else    
+    std::ifstream is(p["read"],std::ifstream::binary);
+    PRlgtReaderKernel fr(is);
+    //#endif
     U.apply_everywhere(fr);
   }
+
+  ScalarFermionField Xi(e, 1, 0, nt());
+  FermionField Psi;
+  for(int i=0;i<ORD;++i)
+    Psi.push_back(ScalarFermionField(e, 1, 0, nt()));
+  std::vector<double> mass(ORD);
+  mass = {4., 0., -2.6057, 0., -4.2925, 0., -11.78};
+  ////////////////////////////////////////////////////////////////////
+  //
+  // initialzie the random gaussian souce for fermions
+  meth::fu::gaussian_source<ScalarFermionField> R(Xi);
 
   ////////////////////////////////////////////////////////////////////
   //
@@ -222,7 +249,7 @@ int main(int argc, char *argv[]) {
     //
     //  gauge update
     timings["Gauge Update"].start();
-    meth::gu::RK2_update<GluonField, StSqK>(U, taug);
+    meth::gu::RK1_update<GluonField, StK>(U, taug);
     timings["Gauge Update"].stop();
 
     ////////////////////////////////////////////////////////
@@ -231,6 +258,23 @@ int main(int argc, char *argv[]) {
     timings["Gauge Fixing"].start();
     meth::gf::gauge_fixing(U, alpha);
     timings["Gauge Fixing"].stop();
+
+
+    ////////////////////////////////////////////////////////
+    //
+    //  fermionic update
+    timings["Fermionic Update"].start();
+    R.update();
+    Xi = R();
+    meth::fu::invert<GluonField,ScalarFermionField,0>(U,Xi,Psi,mass);
+    std::vector<kernels::FermionicUpdateKernel<GluonField,
+    					       ScalarFermionField> > fk;
+    for(Direction mu(0);mu.is_good();++mu)
+      fk.push_back(kernels::FermionicUpdateKernel<GluonField,
+    		   ScalarFermionField>(Xi,Psi,mu,taug*Nf));
+    for(Direction mu(0);mu.is_good();++mu)
+      U.apply_everywhere(fk[mu]);
+    timings["Fermionic Update"].stop();
 
   } // end main for loop
   // write the gauge configuration

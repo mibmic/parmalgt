@@ -389,3 +389,43 @@ TEST(Iterator, TBnd){
   } while ((++i).is_good());
   ASSERT_EQ(0, known.size());
 }
+
+
+///  \author Michele Brambilla <mib.mic@gmail.com>
+///  \date Fri Mar 21 16:20:07 2014
+TEST(Geometry, MultiDir){
+
+  geometry::Geometry<DIM>::extents_t e;
+  std::fill(e.begin(), e.end(), SIZE);
+  geometry::Geometry<DIM> g(e);
+  geometry::Geometry<DIM>::raw_pt_t n,x;
+  std::fill(n.begin(), n.end(), 1);
+  pt::Point<DIM> a(g.mk_point(n)), c(a);
+
+  for(pt::Direction<DIM> mu(0);mu.is_good();++mu) {
+    std::fill(x.begin(), x.end(), 1);
+    x[int(mu)] += SIZE/2;
+    pt::Point<DIM> b(g.mk_point(x));
+    ASSERT_EQ(a+pt::MultiDir<DIM>(SIZE/2,mu),b);
+    ASSERT_EQ(a-pt::MultiDir<DIM>(SIZE/2,mu),b);
+  }
+
+  // same, different syntax
+  for(pt::Direction<DIM> mu(0);mu.is_good();++mu) {
+    std::fill(x.begin(), x.end(), 1);
+    x[int(mu)] += SIZE/2;
+    pt::Point<DIM> b(g.mk_point(x));
+    c=a;
+    ASSERT_EQ(a+mu*(SIZE/2),b);
+    ASSERT_EQ(a-mu*(SIZE/2),b);
+  }
+
+  for (; n[0] < SIZE; ++n[0])
+    for (; n[1] < SIZE; ++n[1])
+      for (; n[2] < SIZE; ++n[2])
+        for (; n[3] < SIZE; ++n[3]) {
+	  a = g.mk_point(n);
+	  ASSERT_EQ(a+pt::Direction<DIM>(0)*SIZE,a);
+	  ASSERT_EQ(a-pt::Direction<DIM>(0)*SIZE,a);
+	}
+};

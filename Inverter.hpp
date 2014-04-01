@@ -26,21 +26,21 @@ namespace meth {
   
   enum bdy{bulk=0,lower=0,upper=0};
   
-  template < template<class,int> class K, class T, int n>
+  template < template<class,class> class K, class T, class B>
   struct FermionInfo {
-    typedef K<T,n> Type;
+    typedef K<T,B> Type;
   };
 
-  template<class Gauge_t,class Field_t,template<class,int> class Kernel_t>
+  template<class Gauge_t,class Field_t,template<class,class> class Kernel_t>
   struct Dirac {
 
-    typedef typename FermionInfo<Kernel_t,Gauge_t,lower>::Type Lower;
-    typedef typename FermionInfo<Kernel_t,Gauge_t,bulk> ::Type Bulk;
-    typedef typename FermionInfo<Kernel_t,Gauge_t,upper>::Type Upper;
+    typedef typename FermionInfo<Kernel_t,Gauge_t,kernels::detail::LowBdy>::Type Lower;
+    typedef typename FermionInfo<Kernel_t,Gauge_t,kernels::detail::NoBdy>::Type Bulk;
+    typedef typename FermionInfo<Kernel_t,Gauge_t,kernels::detail::HighBdy>::Type Upper;
 
-    Dirac(const Field_t& source, const Gauge_t& U, const double& mass) : apply_blk(U, source, mass ),
-									 apply_low(U, source, mass ),
-									 apply_up (U, source, mass ) { };
+    Dirac(const Field_t& source, const Gauge_t& U, const double& mass) : apply_blk(source, mass ),
+									 apply_low(source, mass ),
+									 apply_up (source, mass ) { };
 
     Field_t& operator()(Field_t& dest) {
       const int T = dest.extents()[0];
@@ -61,25 +61,15 @@ namespace meth {
 }
 
 
-std::ostream& operator<<(std::ostream& os,const complex& a) {
-  os << "(" << a.real()
-     << "," << a.imag()
-     << ")";
-  return os;
-}
-
-
-
 namespace inverter {
 
 
   // cgs
-  template<class GluonField,class FermionField,template<class,int> class Kernel_t,int count_max>
+  template<class GluonField,class FermionField,template<class,class> class Kernel_t,int count_max>
   int cgs(const GluonField& U,const FermionField& src,FermionField& x,
 	  const double& m,const double& tol) {
   
     typedef typename meth::Dirac<GluonField,FermionField,Kernel_t> DiracOp;
-    // kernels::WilsonTreeLevel5Kernel> DiracOp;
   
     x = src;
     FermionField r(x), Ax(x), b(src);
@@ -135,7 +125,7 @@ namespace inverter {
   ///
   ///  \author Michele Brambilla <mib.mic@gmail.com>
   ///  \date Thu Jan 17 11:19:12 2013
-  template<class GluonField,class FermionField,template<class,int> class Kernel_t,int count_max>
+  template<class GluonField,class FermionField,template<class,class> class Kernel_t,int count_max>
   int BiCGstab(const GluonField& U,const FermionField& src,FermionField& x,
 	       const double& m, const double& tol )
   {
@@ -175,13 +165,13 @@ namespace inverter {
 	omega = (t*s) / (t*t);
 	x += p * alpha + s * omega;
 	r  = s - t * omega;
-	if (sqrt((r*r).real()) < tol) {
+	if ( abs(r*r) < tol) {
 	  x += p * alpha;
 	  
 	  apply_from_x(Ax);
 	  
 	  r0 = b - Ax;
-	  std::cout << "#\tResidual:" << abs(r0*r0) << "\n#----------------\n";
+	  std::cout << "#\tResidual:" << sqrt(abs(r*r)) << "\n#----------------\n";
 	  return 0;
 	}
 	rho_2 = rho_1;

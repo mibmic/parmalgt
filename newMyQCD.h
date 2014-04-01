@@ -175,18 +175,17 @@ inline SpinColor<DIM> operator*(const SU3 U, const SpinColor<DIM> psi){
   SpinColor<DIM> result;
   v_it d = result.begin();
   for( c_it s = psi.begin(); s != psi.end(); ++s, ++d)  *d = sun::detail::mul(U,(*s));
-  /* for(int i=0;i<DIM;++i) result[i] = U*psi[i]; */
   return result;
 }
 
-template<int DIM>
-inline std::ostream& operator<<(std::ostream& os, const SpinColor<DIM>& f){
-  // for( typename SpinColor<DIM>::const_iterator v_it = f.begin(); v_it != f.end(); ++v_it)
-  //   os << (*v_it) << "\n";
-  // os << std::endl;
-  std::for_each(f.begin(), f.end(), [&](const sun::Vec<3>& i) { os << i; });
-  os << std::endl;
-  return os;
-}
+/* template<int DIM> */
+/* inline std::ostream& operator<<(std::ostream& os, const SpinColor<DIM>& f){ */
+/*   // for( typename SpinColor<DIM>::const_iterator v_it = f.begin(); v_it != f.end(); ++v_it) */
+/*   //   os << (*v_it) << "\n"; */
+/*   // os << std::endl; */
+/*   std::for_each(f.begin(), f.end(), [&](const sun::Vec<3>& i) { os << i; }); */
+/*   os << std::endl; */
+/*   return os; */
+/* } */
 
 #endif

@@ -129,13 +129,29 @@ namespace ptt {
     ///
     ///  \author Dirk Hesse <herr.dirk.hesse@gmail.com>
     ///  \date Mon Mar 26 16:45:23 2012
-
     std::vector<double>::const_iterator &
     unbuffer(std::vector<double>::const_iterator & i){
       for (iterator n = begin(); n!= end(); ++n)
         for (int j = 0; j < 9; ++j){
           (*n)[j].re = *i; ++i;
           (*n)[j].im = *i; ++i;
+        }
+      return i;
+    }    
+
+    //////////////////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////
+    ///
+    ///  Read from buffer.
+    ///
+    ///  \date Tue Mar 11 15:58:41 2014
+    ///  \author Michele Brambilla <mib.mic@gmail.com>
+    std::vector<double>::iterator &
+    unbuffer(std::vector<double>::iterator & i){
+      for (iterator n = begin(); n!= end(); ++n)
+        for (int j = 0; j < 9; ++j){
+          (*n)[j].r = *i; ++i;
+          (*n)[j].i = *i; ++i;
         }
       return i;
     }    

@@ -242,7 +242,7 @@ namespace kernels {
       std::vector<ptsu3> M;
       
       GU_RK1(const Direction& nu, const double& t, Field_t& FF, RF_t &RR) :
-        mu(nu), taug(t), staug(std::sqrt(t)), F(&FF), R(&RR), M(omp_get_max_threads()) { }
+        mu(nu), taug(t/6.), staug(std::sqrt(t)), F(&FF), R(&RR), M(omp_get_max_threads()) { }
   
       void operator()(Field_t& U, const Point& n) {
         // Make a Kernel to calculate and store the plaquette(s)

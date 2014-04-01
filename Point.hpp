@@ -13,7 +13,9 @@
 ///  \author Dirk Hesse <herr.dirk.hesse@gmail.com>
 ///  \date Mon Mar 26 14:51:20 2012
 namespace pt {
-
+  
+  template<int DIM,typename T>
+  struct MultiDir;
 
   //////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////
@@ -41,6 +43,16 @@ namespace pt {
     static const Direction x;
     static const Direction y;
     static const Direction z;
+
+    ///////////////////////////////////
+    ///////////////////////////////////
+    ///  This permits a sintax like "Point + Direction * n", meaning
+    ///  "starting from point Point perform n step in direction
+    ///  Direction" and return the arriving point
+    ///
+    ///  \date Fri Mar 21 16:17:14 2014
+    ///  \author Michele Brambilla <mib.mic@gmail.com>
+    MultiDir<DIM,Direction> operator*(int n) { return MultiDir<DIM,Direction>(n,*this); }
   private:
     int mu;
   };
@@ -50,6 +62,7 @@ namespace pt {
     Direction<DIM> result(i + d);
     return result;
   };
+
 
   template <int DIM>
   class Point {
@@ -99,6 +112,36 @@ namespace pt {
   inline Point<DIM> operator-(const Point<DIM>& p, const Direction<DIM>& mu){
     return Point<DIM>(p) -= mu;
   }
+
+  //////////////////////////////////////
+  //////////////////////////////////////
+  /// Hack to enable multi-step in direction \mu
+  /// 
+  ///  \date Fri Mar 21 11:56:27 2014
+  ///  \author Michele Brambilla <mib.mic@gmail.com>
+  template<int DIM, typename T=pt::Direction<DIM> >
+  struct MultiDir {
+    MultiDir(int nn, const T& m) : n_(nn), mu_(m) { };
+    int& n() { return n_; }
+    const T& mu() { return mu_; }
+  private:
+    const T mu_;
+    int n_;
+  };
+  template<typename A, typename B, int DIM>
+  inline A operator+(A p, MultiDir<DIM,B> md) {
+    do {
+      p += md.mu();
+    } while (--md.n()>0);
+    return p; }
+  template<typename A, typename B, int DIM>
+  inline A operator-(A p, MultiDir<DIM,B> md) {
+    do {
+      p -= md.mu();
+    } while (--md.n()>0);
+    return p;
+  }
+
 
 } // namespace pt
 
