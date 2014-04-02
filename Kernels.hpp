@@ -13,7 +13,6 @@
 #include <IO.hpp>
 #include <uparam.hpp>
 #include <Types.h>
-
 #ifdef _OPENMP
 #include <omp.h>
 #else
@@ -332,6 +331,7 @@ namespace kernels {
     }
   };
 
+
   //////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////
   ///
@@ -373,7 +373,6 @@ namespace kernels {
 
     // zero momentum contribution
     std::vector<ptsu3> M;
->>>>>>> fee64a5458f3caf622754dac93c196966fadef5f
 
     // for testing, c.f. below
     static std::vector<ranlxd::Rand> rands;
@@ -1052,7 +1051,6 @@ namespace kernels {
     weights c;
 
     ptSU3 val;
-
     // here, we need [d_eta C'], which is equal to -[d_eta C], hence
     // we can use Ctilde as above
     BGF Ctilde;
@@ -1160,39 +1158,6 @@ namespace kernels {
   };
 #endif
 
-  //////////////////////////////////////////////////////////////////////
-  //////////////////////////////////////////////////////////////////////
-  ///
-  ///  Kernel to measure the average Plaquette.
-  ///
-  template <class BGF, int ORD,int DIM>
-  struct PlaqKernel {
-
-    typedef BGptSU3<BGF, ORD> ptSU3;
-    typedef ptt::PtMatrix<ORD> ptsu3;
-    typedef BGptGluon<BGF, ORD, DIM> ptGluon;
-    typedef pt::Point<DIM> Point;
-    typedef pt::Direction<DIM> Direction;
-    typedef fields::LocalField<ptGluon, DIM> GluonField;
-    ptSU3 val;
-    PlaqKernel () : val(bgf::zero<BGF>()) { }
-    void operator()(GluonField& U, const Point& n){
-
-      ptSU3 tmp(bgf::zero<BGF>());
-      for (Direction k(0); k.is_good(); ++k)
-        for (Direction t(k+1); t.is_good(); ++t)
-            tmp += U[n][k] * U[n + k][t] * 
-              dag( U[n +t][k] ) * dag( U[n][t] );
-      
-
-#pragma omp critical
-      val += tmp;
-    }
-
-};
-
-
-  //////////////////////////////////////////////////////////////////////
   
 
   namespace detail {
@@ -1269,8 +1234,12 @@ namespace kernels {
     // se le due precedenti le unisco usando fino al return una sola
     // policy che ritorna ad es un pair<F> e solo l'invocazione del
     // return resta specializzata?
+
+
   }
 
+
+  
   //////////////////////////////////////////////////////////////////////
   ///
   /// Wilson dirac operator 
@@ -1546,7 +1515,12 @@ namespace kernels {
       array_t p(DIM);
       raw_pt x = dest.coords(n);
       p[0] = k[0]*(x[0]+.5);
-      pt::MultiDir<DIM> m(ext/2,Direction(0));
+      std::vector<pt::MultiDir<DIM>> m = { pt::MultiDir<DIM>(ext[0]/2,Direction(0)),
+					   pt::MultiDir<DIM>(ext[1]/2,Direction(1)),
+					   pt::MultiDir<DIM>(ext[2]/2,Direction(2)),
+					   pt::MultiDir<DIM>(ext[3]/2,Direction(3)) };
+      
+
       Point l=n+m;
       for( Direction mu(1); mu.is_good(); ++mu )
   	p[int(mu)] = k[int(mu)]*x[int(mu)];
@@ -1633,6 +1607,14 @@ namespace kernels {
     const std::vector<FermionField>& src;
     const int& o;
   };
+
+
+
+
+
+
+
+
 
 
 }

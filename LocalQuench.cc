@@ -33,7 +33,7 @@ void kill_handler(int s){
 // space-time dimensions
 const int DIM = 4;
 // perturbative order
-const int ORD = 4;
+const int ORD = 6;
 // gauge improvement coefficient c1
 const double c_1 =  0.0;
 
@@ -63,8 +63,6 @@ typedef ptt::PtMatrix<ORD> ptsu3; // algebra variables
 typedef BGptGluon<Bgf_t, ORD, DIM> ptGluon; // gluon
 typedef pt::Point<DIM> Point;
 typedef pt::Direction<DIM> Direction;
-typedef std::vector<Cplx>::iterator cpx_vec_it;
-
 
 // shorthand for gluon field
 typedef fields::LocalField<ptGluon, DIM> GluonField;
@@ -74,9 +72,6 @@ typedef GluonField::neighbors_t nt;
 //
 // Make aliases for the Kernels ...
 //
-
-// ... for the gauge action ...
-typedef kernels::StapleReKernel< Bgf_t, ORD, DIM> StapleKernel_t;
 
 // ... for the gauge update/fixing ...
 
@@ -100,6 +95,7 @@ typedef kernels::PlaqKernel<GluonField> PlaqKernel;
 // ... and for the checkpointing.
 typedef kernels::FileWriterKernel<GluonField> FileWriterKernel;
 typedef kernels::FileReaderKernel<GluonField> FileReaderKernel;
+typedef kernels::PRlgtReaderKernel<GluonField> PRlgtReaderKernel;
 
 // Our measurement...
 
@@ -113,6 +109,7 @@ void measure_common(GluonField &U, const std::string& rep_str){
   PlaqKernel P;
   ptSU3 tmp = U.apply_everywhere(P).reduce()/U.vol();
   io::write_file<ptSU3, ORD>(tmp, tmp.bgf().Tr() , "Plaq" + rep_str + ".bindat");
+  
 }
 
 
@@ -208,7 +205,9 @@ int main(int argc, char *argv[]) {
       U.apply_on_timeslice(f, t);
     }
   else {
-    FileReaderKernel fr(p);
+    //    FileReaderKernel fr(p);
+    std::ifstream is(p["read"],std::ifstream::binary);
+    PRlgtReaderKernel fr(is);
     U.apply_everywhere(fr);
   }
 
