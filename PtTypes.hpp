@@ -2,8 +2,7 @@
 #define _PT_TYPES_H_
 
 #include <Types.h>
-#include <MyRand.h>
-#include <MyMath.h>
+#include <ranlxd.hpp>
 #include <Background.h>
 #include <PtAlgo.hpp>
 
@@ -48,10 +47,13 @@ namespace ptt {
     ///  \author Dirk Hesse <herr.dirk.hesse@gmail.com>
     ///  \date Fri Feb  3 12:41:56 2012
 
-    //const SU3_t& operator[](const int& i) const { return array_[i]; }
-    //SU3_t& operator[](const int& i) { return array_[i]; }
+#ifndef DEBUG
+    const SU3_t& operator[](const int& i) const { return array_[i]; }
+    SU3_t& operator[](const int& i) { return array_[i]; }
+#else
     const SU3_t& operator[](const int& i) const { return array_.at(i); }
     SU3_t& operator[](const int& i) { return array_.at(i); }
+#endif
 
     //////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////
@@ -127,13 +129,29 @@ namespace ptt {
     ///
     ///  \author Dirk Hesse <herr.dirk.hesse@gmail.com>
     ///  \date Mon Mar 26 16:45:23 2012
-
     std::vector<double>::const_iterator &
     unbuffer(std::vector<double>::const_iterator & i){
       for (iterator n = begin(); n!= end(); ++n)
         for (int j = 0; j < 9; ++j){
           (*n)[j].re = *i; ++i;
           (*n)[j].im = *i; ++i;
+        }
+      return i;
+    }    
+
+    //////////////////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////
+    ///
+    ///  Read from buffer.
+    ///
+    ///  \date Tue Mar 11 15:58:41 2014
+    ///  \author Michele Brambilla <mib.mic@gmail.com>
+    std::vector<double>::iterator &
+    unbuffer(std::vector<double>::iterator & i){
+      for (iterator n = begin(); n!= end(); ++n)
+        for (int j = 0; j < 9; ++j){
+          (*n)[j].r = *i; ++i;
+          (*n)[j].i = *i; ++i;
         }
       return i;
     }    
@@ -192,15 +210,16 @@ namespace ptt {
     }
 
     self_t& reH() {
-      Cplx tr;
-      for(int i = 0; i < N; i++){
-        array_[i] -= dag(array_[i]);
-        array_[i] *= .5;
-        tr = array_[i].Tr()/3.;
-        array_[i][0] -= tr;
-        array_[i][4] -= tr;
-        array_[i][8] -= tr;
-      }
+      //Cplx tr;
+      //for(int i = 0; i < N; i++){
+        //array_[i] -= array_[i].dag();
+        //array_[i] *= .5;
+        //tr = array_[i].tr()/3.;
+        //array_[i](0) -= tr;
+        //array_[i](4) -= tr;
+        //array_[i](8) -= tr;
+      //}
+      for(int i = 0; i < N; i++) array_[i] = array_[i].reh();
       return *this;
     }
 
@@ -242,12 +261,12 @@ namespace ptt {
 
   template <int N> inline PtMatrix<N> get_random_pt_matrix(){
     PtMatrix<N> result;
-    static MyRand r(1235431);
-#ifdef HAVE_CXX0X
-    for (auto& e : result) { e = SU3rand(r); }
+    static ranlxd::Rand r(1235431);
+#ifdef HAVE_STDCXX_0X
+    for (auto& e : result) { e = sun::SU3rand(r); }
 #else
     for (int i = 0; i < N; ++i)
-      result[i] = SU3rand(r);
+      result[i] = sun::SU3rand(r);
 #endif
     return result;
   }
@@ -267,7 +286,7 @@ namespace ptt {
 
   template <int N>
   inline PtMatrix<N> operator*(const PtMatrix<N>& A, const bgf::AbelianBgf& bg){
-#ifdef HAVE_CXX0X
+#ifdef HAVE_STDCXX_0X
     PtMatrix<N> result(A);
     for (auto& e : result) { e = bg.ApplyFromRight(e); }
 #else
@@ -280,7 +299,7 @@ namespace ptt {
 
   template <int N>
   inline PtMatrix<N> operator*(const PtMatrix<N>& A, const bgf::ScalarBgf& bg){
-#ifdef HAVE_CXX0X
+#ifdef HAVE_STDCXX_0X
     PtMatrix<N> result(A);
     for (auto& e : result) { e = bg.ApplyFromRight(e); }
 #else
@@ -306,7 +325,7 @@ namespace ptt {
 
   template <int N>
   inline PtMatrix<N> operator*(const bgf::AbelianBgf& bg, const PtMatrix<N>& A){
-#ifdef HAVE_CXX0X
+#ifdef HAVE_STDCXX_0X
     PtMatrix<N> result(A);
     for (auto& e : result) { e = bg.ApplyFromLeft(e); }
 #else

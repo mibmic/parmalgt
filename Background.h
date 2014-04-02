@@ -1,14 +1,14 @@
 #ifndef _BACKGROUND_H_
 #define _BACKGROUND_H_
 
-#include "MyMath.h"
 #include <vector>
 #include <algorithm>
 #include <numeric>
 #include <functional>
 #include <math.h>
 #include <Types.h>
-#include <MyRand.h>
+#include <iostream>
+#include <newMyQCD.h>
 
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
@@ -34,6 +34,8 @@ namespace bgf {
     /// Right multiplication.
     virtual SU3 ApplyFromRight ( const SU3 & ) const = 0;
     virtual CVector ApplyFromRight ( const CVector & ) const = 0;
+    // Add to a SU(3) matrix
+    virtual SU3 Add ( const SU3 & ) const = 0;
     // set to zero, or one
     virtual void set_to_one () = 0;
     virtual void set_to_zero () = 0;
@@ -42,6 +44,7 @@ namespace bgf {
     virtual double Norm() const  = 0;
     // Make traceless
     virtual void Trless() = 0;
+    // Make (anti-)hermitian and traceless
     virtual void reH() = 0;
   };
 
@@ -53,6 +56,11 @@ namespace bgf {
     }
     virtual SU3 ApplyFromRight ( const SU3 & U) const {
       return U;
+    }
+    virtual SU3 Add (const SU3 & U) const {
+      SU3 res(U);
+      for ( int i = 0; i < SU3::size ;++i) res(i,i) += 1;
+      return res;
     }
     virtual CVector ApplyFromLeft ( const CVector & U) const {
       return U;
@@ -101,6 +109,9 @@ namespace bgf {
     Cplx & operator[](const short& s){
       return v_[s];
     }
+    const Cplx & operator[](const short& s) const{
+      return v_[s];
+    }
     //////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////
     ///
@@ -130,27 +141,31 @@ namespace bgf {
     ///  \date Tue Sep 27 11:03:50 2011
     virtual SU3 ApplyFromLeft ( const SU3 & U) const {
       SU3 result;
-      for (int i = 0; i < 3; ++i)
-	for (int j = 0; j < 3; ++j)
-	  result.whr[3*i + j] = v_[i] * U.whr[3*i + j];
+      for (int i = 0; i < SU3::size; ++i)
+	for (int j = 0; j < SU3::size; ++j)
+	  result(i, j) = v_[i] * U(i, j);
+      return result;
+    }
+    virtual SU3 Add ( const SU3 & U) const {
+      SU3 result(U);
+      for (int i = 0; i < SU3::size; ++i) result(i, i) += v_[i];
       return result;
     }
     virtual CVector ApplyFromLeft ( const CVector & v) const {
       CVector result;
-      for (int i = 0; i < 3; ++i)
-        result.whr[i] = v_[i] * v.whr[i];
+      for (int i = 0; i < CVector::size; ++i)
+        result[i] = v_[i] * v[i];
       return result;
     }
 
     double Norm() const {
       double result = 0;
 #ifdef HAVE_CXX0X
-      for (const auto& e : v_) { result += e.re*e.re + e.im*e.im; }
+      for (const auto& e : v_) { result += abs(e); }
 #else
-      for (int i = 0; i < 3; ++i)
-        result += v_[i].re*v_[i].re + v_[i].im*v_[i].im;
+      for (int i = 0; i < 3; ++i) result += abs(v_[i]);
 #endif
-      return std::sqrt(result);
+      return result;
     }
 
     //////////////////////////////////////////////////////////////////////
@@ -167,15 +182,15 @@ namespace bgf {
     ///  \date Tue Sep 27 11:03:50 2011
     virtual SU3 ApplyFromRight ( const SU3 & U) const {
       SU3 result;
-      for (int i = 0; i < 3; ++i)
-	for (int j = 0; j < 3; ++j)
-	  result.whr[3*i + j] = v_[j] * U.whr[3*i + j];
+      for (int i = 0; i < SU3::size; ++i)
+	for (int j = 0; j < SU3::size; ++j)
+	  result(i, j) = v_[j] * U(i, j);
       return result;
     }
     virtual CVector ApplyFromRight ( const CVector & v) const {
       CVector result;
-      for (int i = 0; i < 3; ++i)
-        result.whr[i] = v_[i] * v.whr[i];
+      for (int i = 0; i < CVector::size; ++i)
+        result[i] = v_[i] * v[i];
       return result;
     }
     bool operator==(const AbelianBgf& other) const{
@@ -219,6 +234,22 @@ namespace bgf {
       return result *= alpha;
     }
     
+    //////////////////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////
+    ///
+    ///  SpinColor multiplication. Ok, it's awful.. let's see if it works!
+    ///
+    ///  \author Michele Brambilla <mib.mic@gmail.com>
+    ///  \date Fri Feb 01 20:23:23 2013
+    template<int DIM>
+      SpinColor<DIM> operator* (const SpinColor<DIM>& alpha ) const {
+      SpinColor<DIM> result(alpha);
+      for( int mu = 0; mu < DIM; ++mu)
+    	for( int col = 0; col < 3; ++col)
+    	  result[mu][col] *= v_[col];
+      return result;
+    }
+
     //////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////
     ///
@@ -290,16 +321,16 @@ namespace bgf {
     
     virtual void reH() {
 #ifdef HAVE_CXX0X
-      for ( auto& e: v_ ) e.re = 0;
+      for ( auto& e: v_ ) e.real() = 0;
 #else
-      for (int i = 0; i < 3; ++i) v_[i].re = 0;
+      for (int i = 0; i < 3; ++i) v_[i].real() = 0;
 #endif
       Trless();
     }
 
     AbelianBgf dag() const {
       AbelianBgf result(*this);
-      for (int i = 0; i < 3; ++i) result[i].im = -result[i].im;
+      for (int i = 0; i < 3; ++i) result[i] = conj(result[i]);
       return result;
     }
 
@@ -324,8 +355,8 @@ namespace bgf {
     std::vector<double>::iterator &
     buffer(std::vector<double>::iterator & i) const {
       for (const_iterator n = begin(); n!= end(); ++n){
-        *i = n->re; ++i;
-        *i = n->im; ++i;
+        *i = n->real(); ++i;
+        *i = n->imag(); ++i;
       }
       return i;
     }
@@ -360,8 +391,8 @@ namespace bgf {
     std::vector<double>::const_iterator &
     unbuffer(std::vector<double>::const_iterator & i){
       for (iterator n = begin(); n!= end(); ++n){
-        n->re = *i; ++i;
-        n->im = *i; ++i;
+        n->real() = *i; ++i;
+        n->imag() = *i; ++i;
       }
       return i;
     }
@@ -403,7 +434,309 @@ namespace bgf {
     os << "{ ";
     for (AbelianBgf::const_iterator i = b.begin();
            i != b.end(); ++i)
-      os << "(" << i->re << ", " << i->im << ") ";
+      os << "(" << i->real() << ", " << i->imag() << ") ";
+    os << "}";
+    return os;
+  }
+
+  //////////////////////////////////////////////////////////////////////
+  //////////////////////////////////////////////////////////////////////
+  ///
+  ///  Scalar \f$SU(3)\f$ background field.
+  ///
+  ///  \author Dirk Hesse <herr.dirk.hesse@gmail.com>
+  ///  \date Tue Sep 27 11:08:30 2011
+  class ScalarBgf : public BgfBase {
+  public:
+
+    //////////////////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////
+    ///
+    ///  Vector constructor.
+    ///
+    ///  Construct from a three_vec_t as the diagonal elements.
+    ///
+    ///  \param v Vector we want to use for initialzing.
+    ///  \author Dirk Hesse <herr.dirk.hesse@gmail.com>
+    ///  \date Tue Sep 27 11:07:14 2011
+    explicit ScalarBgf(const Cplx &a) : a_(a){ }
+    ScalarBgf() : a_(1, 0) { }
+
+    virtual SU3 ApplyFromLeft ( const SU3 & U) const {
+      SU3 result;
+      for (int i = 0; i < SU3::rep_size; ++i) result[i] = a_ * U[i];
+      return result;
+    }
+    virtual SU3 Add ( const SU3 & U) const {
+      SU3 result(U);
+      for (int i = 0; i < SU3::size; ++i) result(i,i) += a_;
+      return result;
+    }
+    virtual CVector ApplyFromLeft ( const CVector & v) const {
+      CVector result;
+      for (int i = 0; i < CVector::size; ++i) result[i] = a_ * v[i];
+      return result;
+    }
+
+    double Norm() const {
+      return abs(a_);
+    }
+
+    //////////////////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////
+    ///
+    ///  Right multiplication with an \f$SU(3)\f$ matrix.
+    ///
+    ///  This returns the product \f$ U V \f$, where \f$ V \f$ is the
+    ///  background field's value represented by the instance.
+    ///
+    ///  \param U The \$f SU3 \$f matrix the instance is to be applied
+    ///  to. 
+    ///  \author Dirk Hesse <herr.dirk.hesse@gmail.com>
+    ///  \date Tue Sep 27 11:03:50 2011
+    virtual SU3 ApplyFromRight ( const SU3 & U) const {
+      SU3 result;
+      for (int i = 0; i < SU3::rep_size; ++i) result[i] = a_ * U[i];
+      return result;
+    }
+    virtual CVector ApplyFromRight ( const CVector & v) const {
+      CVector result;
+      for (int i = 0; i < CVector::rep_size; ++i) result[i] = a_ * v[i];
+      return result;
+    }
+    bool operator==(const ScalarBgf& other) const{
+      return a_ == other.a_;
+    }
+    //////////////////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////
+    ///
+    ///  Generic *= operator template.
+    ///
+    ///  \author Dirk Hesse <herr.dirk.hesse@gmail.com>
+    ///  \date Mon Sep 26 18:28:23 2011
+    template<class C>
+    ScalarBgf& operator*= ( const C& alpha ) {
+      a_ *= alpha;
+      return *this;
+    }
+    //////////////////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////
+    ///
+    ///  Generic /= operator template.
+    ///
+    ///  \author Dirk Hesse <herr.dirk.hesse@gmail.com>
+    ///  \date Mon Sep 26 18:28:23 2011
+    template<class C>
+    ScalarBgf& operator/= ( const C& alpha ) {
+      a_ /= alpha;
+      return *this;
+    }
+    //////////////////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////
+    ///
+    ///  Generic multiplication.
+    ///
+    ///  \author Dirk Hesse <herr.dirk.hesse@gmail.com>
+    ///  \date Mon Sep 26 18:28:36 2011
+    template<class C>
+    ScalarBgf operator* (const C& alpha ) const {
+      ScalarBgf result(*this);
+      return result *= alpha;
+    }
+
+    //////////////////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////
+    ///
+    ///  Multiplication with CVector and SpinColor
+    ///
+    ///  \author Michele
+    ///  \date Wed Oct 17
+    //inline CVector operator* (const CVector& v ) const {
+    //  CVector result;
+    //  return result = v * a_;
+    //}
+    template<int DIM>
+    inline SpinColor<DIM> operator* (const SpinColor<DIM>& v ) const {
+      SpinColor<DIM> result;
+#ifdef HAVE_CXX0X
+      for( auto it = v.begin(), r = result.begin();
+	   it != v.end(); ++it, ++r) (*r) = a_ * (*it);
+#else
+      typename SpinColor<DIM>::const_iterator i = v.begin(), e = v.end();
+      typename SpinColor<DIM>::iterator r = result.begin();
+      for (; i != e; ++i, ++r) (*r) = a_ * (*i);
+#endif
+      return result;
+    }
+
+
+    //////////////////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////
+    ///
+    ///  Multiplication with self type.
+    ///
+    ///  \author Dirk Hesse <herr.dirk.hesse@gmail.com>
+    ///  \date Tue Sep  4 15:18:20 2012
+
+    inline ScalarBgf operator* (const ScalarBgf& alpha ) const {
+      ScalarBgf result(*this);
+      return result *= alpha.a_;
+    }
+    //////////////////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////
+    ///
+    ///  Addition and subtraction of a sclar.
+    ///
+    ///  \author Dirk Hesse <herr.dirk.hesse@gmail.com>
+    ///  \date Wed Jan 11 18:03:06 2012
+
+    template<class C>
+    ScalarBgf& operator+= (const C& alpha ){
+      a_ += alpha;
+      return *this;
+    }
+    ScalarBgf& operator+= (const ScalarBgf& alpha ){
+      a_ += alpha.a_;
+      return *this;
+    }
+    ScalarBgf operator-() const{
+      ScalarBgf result;
+      result.a_ = -a_;
+      return result;
+    }
+    template<class C>
+    ScalarBgf& operator-= (const C& alpha ){
+      a_ -= alpha;
+      return *this;
+    }
+    ScalarBgf& operator-= (const ScalarBgf& alpha ){
+      a_ -= alpha.a_;
+      return *this;
+    }
+
+    template<class C>
+    ScalarBgf operator+ (const C& alpha ) const {
+      ScalarBgf result(*this);
+      return result += alpha;
+    }
+    template<class C>
+    ScalarBgf operator- (const C& alpha ) const {
+      ScalarBgf result(*this);
+      return result -= alpha;
+    }
+    ScalarBgf inverse() const {
+      ScalarBgf result;
+      result.a_ = 1./a_;
+      return result;
+    }
+    void set_to_one() { a_ = Cplx(1,0);};
+    void set_to_zero() { a_ = Cplx(0,0);};
+    /// Trace
+    Cplx Tr() const {
+      return a_ * 3.;
+    }
+
+    /// Make traceless
+    virtual void Trless() {
+      set_to_zero();
+    }
+
+    //////////////////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////
+    ///
+    ///  reH
+    ///
+    ///  This takes the traceless part of 0.5*[V - V^\dagger]
+    ///
+    ///  \author Dirk Hesse <herr.dirk.hesse@gmail.com>
+    ///  \date Fri Feb  3 16:23:25 2012
+    
+    virtual void reH() {
+      Trless();
+    }
+
+    ScalarBgf dag() const {
+      ScalarBgf result(conj(a_));
+      return result;
+    }
+
+    //////////////////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////
+    ///
+    ///  Number of doubles needed to store the object.
+    ///
+    ///  \author Dirk Hesse <herr.dirk.hesse@gmail.com>
+    ///  \date Sun Mar 25 14:50:37 2012
+
+    static const int storage_size = 2;
+
+    //////////////////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////
+    ///
+    ///  Buffer to a vector of doubles.
+    ///
+    ///  \author Dirk Hesse <herr.dirk.hesse@gmail.com>
+    ///  \date Sun Mar 25 14:50:53 2012
+
+    std::vector<double>::iterator &
+    buffer(std::vector<double>::iterator & i) const {
+        *i = a_.real(); ++i;
+        *i = a_.imag(); ++i;
+      return i;
+    }
+  
+    //////////////////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////
+    ///
+    ///  Write to a file
+    ///
+    ///  \author Dirk Hesse <herr.dirk.hesse@gmail.com>
+    ///  \date Fri May 25 16:02:33 2012
+
+    template <class Writer_t>
+    void write(Writer_t& o) const {
+      o.write(a_);
+    }
+    template <class Reader_t>
+    void read(Reader_t& o) {
+      o.read(a_);
+    }
+
+    //////////////////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////
+    ///
+    ///  Read from a buffer
+    ///
+    ///  \author Dirk Hesse <herr.dirk.hesse@gmail.com>
+    ///  \date Mon Mar 26 16:43:22 2012
+
+    std::vector<double>::const_iterator &
+    unbuffer(std::vector<double>::const_iterator & i){
+      a_.real() = *i; ++i;
+      a_.imag() = *i; ++i;
+      return i;
+    }
+
+    const Cplx& val() const { return a_; }
+
+  private:
+    //////////////////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////
+    ///
+    ///  Diagonal elements of V.
+    ///
+    ///  \author Dirk Hesse <herr.dirk.hesse@gmail.com>
+    ///  \date Tue Sep 27 10:50:29 2011
+    Cplx a_;
+  };
+
+  inline ScalarBgf dag(const ScalarBgf& b){
+    return b.dag();
+  }
+
+  inline std::ostream& operator<<(std::ostream& os, const ScalarBgf& b){
+    os << "{ ";
+    os << "(" << b.val().real() << ", " << b.val().imag() << ") ";
     os << "}";
     return os;
   }
@@ -707,8 +1040,8 @@ namespace bgf {
     ///
     ///  \author Dirk Hesse <herr.dirk.hesse@gmail.com>
     ///  \date Tue Sep 27 10:46:16 2011
-    AbelianBgfFactory(const int &T, const int& L, const int& s = 0) 
-      : Vt_(T+1){
+    AbelianBgfFactory(const int &T_in, const int& L, const int& s = 0) 
+      : Vt_(T_in+1), T(T_in){
       if (T < 0)
         throw std::exception();
       //if (!s) {
@@ -745,6 +1078,9 @@ namespace bgf {
       Cp(2,2) = -eta * ( nu - 0.5) + 2.*pi/3;
       C *= Cplx(0, 1./L);
       Cp *= Cplx(0, 1./L);
+      //for (int t = 0; t <= T; ++t)
+      //  for (int k = 0; k < 3; ++k)
+      //    Vt_[t][k] = exp((t * Cp(k,k) + (L - t)*C(k,k))/L);
       // Values for the diagonals of V at t = 0, T
       for (int k = 0; k < 3; ++k){
         Vt_[0][k] = exp( C(k,k) ) * ct;
@@ -755,14 +1091,27 @@ namespace bgf {
         Vt_[t][0] = exp(-2. * f[s+1][L/2 - 2] * (t - 0.5*T) * i + 0.5 
                         * (C(0,0) + Cp(0,0)));
         for (int k = 1; k < 3; ++k)
-          Vt_[t][k] = exp(f[s+1][L/2 - 2] * (t - 0.5*T) * i + 0.5 
+          Vt_[t][k] = exp(    f[s+1][L/2 - 2] * (t - 0.5*T) * i + 0.5 
                           * (C(k,k) + Cp(k,k)));
       }
     };
-    const three_vec_t& get(int t){ return Vt_.at(t); }
+    // spatial components, V_k
+    const three_vec_t& get(int t){ return Vt_.at(t); } 
+    // temporal, V_0, set V_0(t = T) to 0, such that one can exploit
+    // the periodicity of the lattice for e.g. LW improved gauge
+    // actions.
+    const three_vec_t& get_temporal(int t) const {
+      static three_vec_t one = {1,1,1};
+      static three_vec_t zero = {0,0,0};
+      if (t >= T)
+	return zero;
+      else
+	return one;
+    }
   private:
     std::vector <three_vec_t> Vt_;
     static const double f[3][31];
+    int T;
   };
 
   /// Returns V_\mu(t)
@@ -772,9 +1121,9 @@ namespace bgf {
                                     const int& L = 0,
                                     const int& s = 0){
     static AbelianBgfFactory factory(T, L, s);
-    static three_vec_t one = {1,1,1};
+
     if (!mu)
-      return AbelianBgf(one);
+      return AbelianBgf(factory.get_temporal(t));
     else
       return AbelianBgf(factory.get(t));
   };
@@ -792,15 +1141,15 @@ namespace bgf {
     three_vec_t alpha_v = {0, 0, 0};
     return AbelianBgf(alpha_v);
   };
-
   template <> inline ScalarBgf zero<ScalarBgf>() {
-    Cplx a(0,0);
-    return ScalarBgf(a);
+    return ScalarBgf(0);
   };
   
   inline AbelianBgf random(){
-    static MyRand r(134);
-    three_vec_t alpha_v = {r.Rand(), r.Rand(), r.Rand()};
+    srand(time(NULL));
+    three_vec_t alpha_v = {rand()/static_cast<double>(RAND_MAX),
+			   rand()/static_cast<double>(RAND_MAX),
+			   rand()/static_cast<double>(RAND_MAX) };
     return AbelianBgf(alpha_v);
   };
 }

@@ -1,16 +1,22 @@
 #ifndef _IO_H_
 #define _IO_H_
 
+#include <Types.h>
 #include <iostream>
 #include <fstream>
-#include <MyMath.h>
 #include <vector>
 #include <sstream>
 #include <uparam.hpp>
-
-
+#ifdef USE_MPI
+#include <mpi.h>
+#endif
 // Note the MD5 Copyright notice in the 
 // implementation file IO.cc!
+
+
+namespace comm {
+  template<class T> struct Reduce;
+}
 
 namespace io {
 
@@ -27,6 +33,43 @@ namespace io {
       unsigned u[8 * unsigned_per_double];
       unsigned char c[8 * char_per_double];
     };
+
+
+    //////////////////////////////////////////
+    //
+    // MB: actual writing
+    inline void to_bin_file(std::ofstream& of, const Cplx& c){
+      of.write(reinterpret_cast<const char*>(&c.real()), sizeof(double));
+      of.write(reinterpret_cast<const char*>(&c.imag()), sizeof(double));
+    }
+    template <class ptSU3, int ORD>
+    inline void write_file(const ptSU3& U, const Cplx& tree, const std::string& fname){
+      std::ofstream of(fname.c_str(), std::ios_base::app |  std::ios_base::binary);
+      to_bin_file(of, tree);
+      for (int i = 0; i < ORD; ++i)
+	to_bin_file(of, U[i].tr());
+      of.close();
+    }
+    template <class CONT>
+    inline void write_file(const CONT& c, const std::string& fname){
+      std::ofstream of(fname.c_str(), std::ios_base::app |  std::ios_base::binary);
+      for (typename CONT::const_iterator i = c.begin(), j = c.end(); i != j; ++i)
+	of.write(reinterpret_cast<const char*>(&(*i)), sizeof(typename CONT::value_type));
+      of.close();
+    }
+    template <class CONT>
+    inline void write_ptSUN(const CONT& c, const std::string& fname){
+      std::ofstream of(fname.c_str(), std::ios_base::app |  std::ios_base::binary);
+      Cplx tmp = c.bgf().Tr();
+      to_bin_file(of, tmp);
+      for (typename CONT::const_iterator i = c.begin(), j = c.end(); i != j; ++i){
+	tmp = i->Tr();
+	of.write(reinterpret_cast<const char*>(&tmp), sizeof(Cplx));
+      }
+      of.close();
+    }
+
+
   }
 
   class CheckedIo;
@@ -135,7 +178,7 @@ namespace io {
     }
     ~CheckedOut() { 
       os.close();
-      param["md5"] = CheckedIo::md5();
+      param.set("md5", CheckedIo::md5());
       param.write(param["write"] + ".info");
     }
     //////////////////////////////////////////////////////////////////////
@@ -146,10 +189,10 @@ namespace io {
     ///  \author Dirk Hesse <herr.dirk.hesse@gmail.com>
     ///  \date Wed May 30 18:40:45 2012
     void write(const Cplx &c){
-      CheckedIo::process(c.re);
-      CheckedIo::process(c.im);
-      os.write(reinterpret_cast<char const*>(&(c.re)), sizeof(double));
-      os.write(reinterpret_cast<char const*>(&(c.im)), sizeof(double));
+      CheckedIo::process(c.real());
+      CheckedIo::process(c.imag());
+      os.write(reinterpret_cast<char const*>(&(c.real())), sizeof(double));
+      os.write(reinterpret_cast<char const*>(&(c.imag())), sizeof(double));
     }
   private:
     std::ofstream os;
@@ -176,8 +219,19 @@ namespace io {
       for (uparam::Param::const_iterator i = param.begin(); i!=
              param.end(); ++i){
         if (i->first == "md5" || i->first == "read" 
-            || i->first == "write" || i->first == "seed")
+            || i->first == "write" || i->first == "NRUN")
           continue;
+        if ( i->first == "seed" ) {
+	  if( i->second == p[i->first] ) {
+	    std::cout << "Change your seed! " << std::endl;
+	    std::cout << "   in .info file : " << i->second 
+		      << ", in current simulation " 
+		      << p[i->first] << std::endl;
+	    throw IoError();
+	  }
+	  else 
+	    continue;
+	}
         if (i->second != p[i->first]){
           std::cout << "Parameter mismatch: "<< i->first << std::endl;
           std::cout << "   in .info file : " << i->second 
@@ -198,10 +252,10 @@ namespace io {
       }
     }
     void read(Cplx& c){
-      is.read(reinterpret_cast<char*>(&(c.re)), sizeof(double));
-      is.read(reinterpret_cast<char*>(&(c.im)), sizeof(double));
-      CheckedIo::process(c.re);
-      CheckedIo::process(c.im);
+      is.read(reinterpret_cast<char*>(&(c.real())), sizeof(double));
+      is.read(reinterpret_cast<char*>(&(c.imag())), sizeof(double));
+      CheckedIo::process(c.real());
+      CheckedIo::process(c.imag());
     }
   private:
     std::ifstream is;
@@ -212,37 +266,45 @@ namespace io {
   // writing binary data to files
   
   inline void to_bin_file(std::ofstream& of, const Cplx& c){
-    of.write(reinterpret_cast<const char*>(&c.re), sizeof(double));
-    of.write(reinterpret_cast<const char*>(&c.im), sizeof(double));
+    of.write(reinterpret_cast<const char*>(&c.real()), sizeof(double));
+    of.write(reinterpret_cast<const char*>(&c.imag()), sizeof(double));
   }
   template <class ptSU3, int ORD>
   inline void write_file(const ptSU3& U, const Cplx& tree, const std::string& fname){
-    std::ofstream of(fname.c_str(), std::ios_base::app |  std::ios_base::binary);
-    to_bin_file(of, tree);
-    for (int i = 0; i < ORD; ++i)
-      to_bin_file(of, U[i].Tr());
-    of.close();
+#ifdef USE_MPI
+    comm::Reduce<ptSU3> reduce(U);
+    ptSU3 A = reduce();
+    if(reduce.rank()==0) 
+      detail::write_file<ptSU3,ORD>(A,tree*reduce.np(),fname);
+    MPI_Barrier(MPI_COMM_WORLD);
+#else
+    detail::write_file<ptSU3,ORD>(U,tree,fname);
+#endif
   }
-
-  inline void write_file(const std::vector<Cplx> vec, const std::string& fname){
-    std::ofstream of(fname.c_str(), std::ios_base::app |  std::ios_base::binary);
-    for (int i = 0; i < vec.size(); ++i)
-      to_bin_file(of, vec[i]);
-    of.close();
+  template <class CONT>
+  inline void write_file(const CONT& c, const std::string& fname){
+#ifdef USE_MPI
+    comm::Reduce<CONT> reduce(c);
+    CONT s = reduce();
+    if(reduce.rank()==0)
+      detail::write_file<CONT>(s,fname);
+    MPI_Barrier(MPI_COMM_WORLD);
+#else
+    detail::write_file<CONT>(c,fname);
+#endif
   }
-  
-  ////////////////////////////////////////////////////////////
-  // formated cout for the timings/parameters
-  template <typename T>
-  inline void pretty_print(const std::string& s, const T& d,
-                           const std::string& unit = ""){
-    std::cout.width(25); 
-    std::cout << s; 
-    std::cout.width(0);
-    std::cout << ": " << d << unit << std::endl;
-  };
-
-
+  template <class CONT>
+  inline void write_ptSUN(const CONT& c, const std::string& fname){
+#ifdef USE_MPI
+    comm::Reduce<CONT> reduce(c);
+    CONT s = reduce();
+    if(reduce.rank()==0)
+      detail::write_ptSUN<CONT>(s,fname);
+    MPI_Barrier(MPI_COMM_WORLD);
+#else
+    detail::write_ptSUN<CONT>(c,fname);
+#endif
+  }
 }
 
 

@@ -8,16 +8,14 @@ const int MYORD = 10;
 
 typedef BGptSU3<bgf::AbelianBgf, MYORD> ptSU3;
 typedef ptt::PtMatrix<MYORD> ptsu3;
-typedef BGptCVector<MYORD> ptCVector;
+//typedef BGptCVector<MYORD> ptCVector;
 typedef BGptGluon<bgf::AbelianBgf, MYORD, 4> ptGluon;
-typedef BGptSpinColor<MYORD, 4> ptSpinColor;
-
-MyRand r(23797);
+//typedef BGptSpinColor<MYORD, 4> ptSpinColor;
 
 int L = std::rand() % 100;
 int T = std::rand() % 100;
-double eta = r.Rand();
-double nu = r.Rand();
+double eta = std::rand()/static_cast<double>(RAND_MAX);
+double nu = std::rand()/static_cast<double>(RAND_MAX);
 // initialize the background field
 
 
@@ -85,8 +83,10 @@ TEST_F(AbelianBgfTest, Add){
 // Testing the scalar multiplicatiohn
 
 TEST_F(AbelianBgfTest, ScalarMultiply){
-  Cplx alpha(r.Rand(), r.Rand());
-  Cplx beta(r.Rand(), r.Rand());
+  Cplx alpha(std::rand()/static_cast<double>(RAND_MAX),
+	     std::rand()/static_cast<double>(RAND_MAX));
+  Cplx beta(std::rand()/static_cast<double>(RAND_MAX),
+	    std::rand()/static_cast<double>(RAND_MAX));
   ptSU3 beta_B = MyPtSU3B;
   beta_B *= beta;
   for (int i = 0; i < MYORD; ++i){
@@ -103,68 +103,68 @@ TEST_F(AbelianBgfTest, ScalarMultiply){
   }
 }
 
-TEST(BGptCVector, ArithmeticPlusSelf){
-  ptCVector u, v, w;
-  for( ptCVector::iterator i = v.begin(), j = w.begin();
-         i != v.end(); ++i, ++j)
-    for (int k = 0; k < 3; ++k){
-      i->whr[k] = Cplx(r.Rand(), r.Rand());
-      j->whr[k] = i->whr[k]*3;
-    }
-  u = v+v;
-  u += v;
-  for( ptCVector::iterator i = u.begin(), j = w.begin();
-         i != u.end(); ++i, ++j)
-    ASSERT_TRUE(*i == *j);
-}
+//TEST(BGptCVector, ArithmeticPlusSelf){
+//  ptCVector u, v, w;
+//  for( ptCVector::iterator i = v.begin(), j = w.begin();
+//         i != v.end(); ++i, ++j)
+//    for (int k = 0; k < 3; ++k){
+//      i->whr[k] = Cplx(r.Rand(), r.Rand());
+//      j->whr[k] = i->whr[k]*3;
+//    }
+//  u = v+v;
+//  u += v;
+//  for( ptCVector::iterator i = u.begin(), j = w.begin();
+//         i != u.end(); ++i, ++j)
+//    ASSERT_TRUE(*i == *j);
+//}
+//
+//TEST(BGptCVector, ProductWithSU3){
+//  ptCVector v, w;
+//  SU3 One;
+//  CVector OneV, ZeroV;
+//  ptSU3 A(bgf::unit<bgf::AbelianBgf>());
+//  for (int i = 0; i < 3; ++i){
+//    One(i,i) = Cplx(1,0);
+//    OneV.whr[i] = Cplx(1,0);
+//  }
+//  A[3] = One*2;
+//  for (int i = 0; i < 3; ++i)
+//    v[1].whr[i] = Cplx(3,0);
+//  w = v*A;
+//  ASSERT_TRUE(w[0] == ZeroV);
+//  ASSERT_TRUE(w[1] == OneV*Cplx(3,0));
+//  ASSERT_TRUE(w[2] == ZeroV);
+//  ASSERT_TRUE(w[3] == ZeroV);
+//  ASSERT_TRUE(w[4] == ZeroV);
+//  ASSERT_TRUE(w[5] == OneV*Cplx(6,0));
+//  ASSERT_TRUE(w[6] == ZeroV);
+//}
 
-TEST(BGptCVector, ProductWithSU3){
-  ptCVector v, w;
-  SU3 One;
-  CVector OneV, ZeroV;
-  ptSU3 A(bgf::unit<bgf::AbelianBgf>());
-  for (int i = 0; i < 3; ++i){
-    One(i,i) = Cplx(1,0);
-    OneV.whr[i] = Cplx(1,0);
-  }
-  A[3] = One*2;
-  for (int i = 0; i < 3; ++i)
-    v[1].whr[i] = Cplx(3,0);
-  w = v*A;
-  ASSERT_TRUE(w[0] == ZeroV);
-  ASSERT_TRUE(w[1] == OneV*Cplx(3,0));
-  ASSERT_TRUE(w[2] == ZeroV);
-  ASSERT_TRUE(w[3] == ZeroV);
-  ASSERT_TRUE(w[4] == ZeroV);
-  ASSERT_TRUE(w[5] == OneV*Cplx(6,0));
-  ASSERT_TRUE(w[6] == ZeroV);
-}
-
-TEST(BGptSpinColor, ProductWithGluon){
-  ptGluon U;
-  SU3 One;
-  CVector OneV, ZeroV;
-  ptSU3 A(bgf::unit<bgf::AbelianBgf>());
-  ptSpinColor psi, chi;
-  for (int i = 0; i < 3; ++i){
-    One(i,i) = Cplx(1,0);
-    OneV.whr[i] = Cplx(1,0);
-  }
-  for (int i = 0; i < 4; ++i){
-    U[i].bgf() = bgf::unit<bgf::AbelianBgf>();
-    U[i][i] = One*i;
-    psi[i][5] = OneV*i;
-  }
-  chi = psi*U; // <-- check this
-  for (int i = 0; i < 4; ++i)
-    for (int j = 0; j <= MYORD; ++j)
-      if (i && j == 5)
-        ASSERT_TRUE(chi[i][j] == OneV*Cplx(i));
-      else if (i && j == 5 + i + 1)
-        ASSERT_TRUE(chi[i][j] == OneV*Cplx(i)*Cplx(i));
-      else
-        ASSERT_TRUE(chi[i][j] == ZeroV);
-}
+//TEST(BGptSpinColor, ProductWithGluon){
+//  ptGluon U;
+//  SU3 One;
+//  CVector OneV, ZeroV;
+//  ptSU3 A(bgf::unit<bgf::AbelianBgf>());
+//  ptSpinColor psi, chi;
+//  for (int i = 0; i < 3; ++i){
+//    One(i,i) = Cplx(1,0);
+//    OneV.whr[i] = Cplx(1,0);
+//  }
+//  for (int i = 0; i < 4; ++i){
+//    U[i].bgf() = bgf::unit<bgf::AbelianBgf>();
+//    U[i][i] = One*i;
+//    psi[i][5] = OneV*i;
+//  }
+//  chi = psi*U; // <-- check this
+//  for (int i = 0; i < 4; ++i)
+//    for (int j = 0; j <= MYORD; ++j)
+//      if (i && j == 5)
+//        ASSERT_TRUE(chi[i][j] == OneV*Cplx(i));
+//      else if (i && j == 5 + i + 1)
+//        ASSERT_TRUE(chi[i][j] == OneV*Cplx(i)*Cplx(i));
+//      else
+//        ASSERT_TRUE(chi[i][j] == ZeroV);
+//}
 
 //TEST(BGptSU3Test, dag){
 //  ptSU3 A(bgf::random()), B;
@@ -207,7 +207,7 @@ TEST(BGptSU3Test, expUnit){
     // tree level
     ASSERT_TRUE(D.bgf() == bgf::unit<bgf::AbelianBgf>());
     for (int i = 0; i < 7; ++i)
-      ASSERT_TRUE( SU3Cmp( zero, D[i] )(1e-14*i) ) << i;
+      ASSERT_TRUE( SU3Cmp( zero, D[i] )(2e-14*i) );
   }
 }
 
@@ -218,7 +218,7 @@ TEST(BGptSU3Test, inverse){
   ptSU3 unit = Z*W;
   ASSERT_TRUE( unit.bgf() == bgf::unit<bgf::AbelianBgf>() );
   for (int i = 0; i < MYORD; ++i)
-    ASSERT_TRUE( SU3Cmp( unit[i], SU3() )(1e-13) ) << i;
+    ASSERT_TRUE( SU3Cmp( unit[i], SU3() )(1e-10) ) << i;
 }
 
 TEST(BGptSU3Test, expUnitMore){
@@ -247,7 +247,7 @@ TEST(BGptSU3Test, Multiplication){
     c.randomize(); c.bgf() = bgf::random();
     d = (a*b)*c; e = a*(b*c);
     for (int i = 0; i < MYORD; ++i)
-      ASSERT_TRUE( SU3Cmp( d[i], e[i] )(1e-14*(i+1)) ) << i;
+      ASSERT_TRUE( SU3Cmp( d[i], e[i] )(1e-13*(i+1)) ) << i;
   }
 }    
 
@@ -263,6 +263,7 @@ TEST(BGptSU3Test, logThrows){
 TEST(BGptSU3Test, log){
   ptSU3 A(bgf::unit<bgf::AbelianBgf>());
   A.randomize();
+  A.bgf().set_to_one();
   // this assumes A has unit background field
   ptsu3 B = log(A);
   // one loop
@@ -280,9 +281,9 @@ TEST(BGptSU3Test, log){
 TEST(BGptSU3Test, logexp){
   ptt::PtMatrix<MYORD> A = ptt::get_random_pt_matrix<MYORD>(), B;
   B = log(exp<bgf::AbelianBgf,MYORD>(A));
-
   ptSU3 C(bgf::unit<bgf::AbelianBgf>()), D;
   C.randomize();
+  C.bgf().set_to_one();
   D = exp<bgf::AbelianBgf,MYORD>(log(C));
   // higher orders
   // a quick and dirty estimate gives that the round-off error should

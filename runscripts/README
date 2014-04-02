@@ -1,0 +1,15 @@
+=============================================
+Scripts to run the code on different machines
+=============================================
+
+run.sh
+======
+
+A very naive script that writes the flow_ipt file and run
+LocalQuenchFlow. Make sure you modify the script to accommodate for
+the parmeters you require.
+
+submit.py
+=========
+
+A more complex python script to run for a whole set of parameters.

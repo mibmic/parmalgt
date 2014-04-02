@@ -1,0 +1,7 @@
+[submodule "ranlxd"]
+	path = ranlxd
+	url = git://github.com/dhesse/ranlxd.git
+[submodule "sun-sources"]
+	path = sun-sources
+	url = git://github.com/dhesse/sun.git
+

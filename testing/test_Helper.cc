@@ -1,13 +1,15 @@
 #include "Helper.h"
 #include "gtest/gtest.h"
 
-MyRand r(32490714);
+double Rand(){
+  return 1.*rand()/RAND_MAX;
+}
 
 TEST(SU3CmpTest, EqualMatrices){
   SU3 A,B;
   for (int i = 0; i < 9; ++i){
-    A.whr[i] = Cplx(r.Rand(), r.Rand());
-    B.whr[i] = A.whr[i];
+    A[i] = Cplx(Rand(), Rand());
+    B[i] = A[i];
   }
   ASSERT_TRUE(SU3Cmp(A,B)(0.0));
 }
@@ -15,12 +17,12 @@ TEST(SU3CmpTest, EqualMatrices){
 TEST(SU3CmpTest, NotEqualMatrices){
   SU3 A,B;
   for (int i = 0; i < 9; ++i){
-    A.whr[i] = Cplx(r.Rand(), r.Rand());
-    B.whr[i] = A.whr[i];
+    A[i] = Cplx(Rand(), Rand());
+    B[i] = A[i];
   }
   for (int i = 8; i >= 0; --i){
     A = B;
-    A.whr[i] = Cplx(r.Rand(), r.Rand());
+    A[i] = Cplx(Rand(), Rand());
     ASSERT_FALSE(SU3Cmp(A,B)());
   }
 }

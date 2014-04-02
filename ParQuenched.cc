@@ -1,10 +1,13 @@
-#include <LocalGluonField.hpp>
+#include <LocalField.hpp>
 #include <Background.h>
 #include <Geometry.hpp>
 #include <algorithm>
 #include <newQCDpt.h>
 #include <mpi.h>
 #include <iostream>
+#include <Methods.hpp>
+
+#include <Communicator.hpp>
 
 const int DIM = 4;
 const int ORD = 6;
@@ -20,12 +23,13 @@ typedef GluonField::neighbors_t nt;
 struct MeasTrace {
   std::vector<double> traces;
   MeasTrace() : traces(ORD + 1, 0) { }
+  static const int n_cb = 0;
   void operator()(GluonField& U,
                   const pt::Point<DIM>& n){
     for (pt::Direction<DIM> mu; mu.is_good(); ++mu){
-      traces[0] += U[n][mu].bgf().Tr().re;
+      traces[0] += U[n][mu].bgf().Tr().real();
       for (int i = 0; i < ORD; ++i) 
-        traces[i+1] += U[n][mu][i].Tr().re;
+        traces[i+1] += U[n][mu][i].tr().real();
     }
   }
 };
@@ -59,34 +63,41 @@ int main(int argc, char *argv[]) {
   geometry::Geometry<DIM>::extents_t e;
   // we want a L = 4 lattice
   std::fill(e.begin(), e.end(), 4);
-  // initialize parallel enviornment
-  int rank , numprocs;
-  MPI_Init(&argc, &argv);
-  MPI_Comm_size(MPI_COMM_WORLD, &numprocs);
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  if (numprocs != 2){
-    std::cout << "Please start the test program with two processes!\n";
-    return 1;
-  }
-  // tell the process which are the neighbors
-  int zup = (rank == numprocs - 1) ? 0 : rank + 1;
-  int zdown = (!rank) ? numprocs - 1 : rank - 1;
-  nt n = neighbors(0,0,0,0,0,0, zup, zdown);
-  GluonField U(e, 1, rank, n);  
-  if (rank == 0){
-    U.randomize();
-    U.test_send_fwd_z();
+  // // initialize parallel enviornment
+  // int rank , numprocs;
+  // MPI_Init(&argc, &argv);
+  // MPI_Comm_size(MPI_COMM_WORLD, &numprocs);
+  // MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  // if (numprocs != 2){
+  //   std::cout << "Please start the test program with two processes!\n";
+  //   return 1;
+  // }
+  // // tell the process which are the neighbors
+  // int zup = (rank == numprocs - 1) ? 0 : rank + 1;
+  // int zdown = (!rank) ? numprocs - 1 : rank - 1;
+  // nt n = neighbors(0,0,0,0,0,0, zup, zdown);
+  const int buff_sz = 1;
+  comm::Communicator<GluonField> comm(e);
+  comm.init(argc,argv);
+  GluonField U(e, 1);  
+  // GluonField U(e, 1, rank, n);  
+  meth::gu::detail::rand_gen_<GluonField> r(U);
+  if (comm.rank() == 0){
+    r.update();
+    // U.test_send_fwd_z();
     std::cout << "real parts traces sent:\n";
     MeasTrace m;
-    U.measure_on_slice_with_bnd(m, pt::Direction<DIM>(3), 4);
+    // U.measure_on_slice_with_bnd(m, pt::Direction<DIM>(3), 4);
+    U.apply_everywhere(m);
     for (int i = 0; i <= ORD; ++i)
       std::cout << i << "\t" << m.traces[i] << std::endl;
   }
   else {
-    U.test_rec_bkw_z();
+    // U.test_rec_bkw_z();
     std::cout << "real parts of traces received:\n";
     MeasTrace m;
-    U.measure_on_slice_with_bnd(m, pt::Direction<DIM>(3), 4);
+    //    U.measure_on_slice_with_bnd(m, pt::Direction<DIM>(3), 4);
+    U.apply_everywhere(m);
     for (int i = 0; i <= ORD; ++i)
       std::cout << i << "\t" << m.traces[i] << std::endl;
   }

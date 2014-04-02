@@ -4,12 +4,7 @@
 #include <string>
 #include <algorithm>
 #include <map>
-
-namespace io {
-  template <typename T>
-  inline void pretty_print(const std::string& s, const T& d, 
-                           const std::string& unit = "");
-}
+#include <util.hpp>
 
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
@@ -20,6 +15,9 @@ namespace io {
 ///  \date Wed May 30 16:39:24 2012
 
 namespace uparam {
+
+  class ParameterNotFoundError : public std::exception { };
+
   class Param {
   public:
     typedef std::map<std::string, std::string> map_t;
@@ -49,12 +47,20 @@ namespace uparam {
         of << i->first << "  " << i->second << "\n";
       of.close();
     }
-    std::string& operator[](const std::string& s){
-      return params[s];
+    const std::string& operator[](const std::string& s) const {
+      map_t::const_iterator i = params.find(s);
+      if (i == params.end()){
+        std::cerr << "Parameter " << s << " not found!\nABORTING!\n";
+        throw ParameterNotFoundError();
+      }
+      return i->second;
     }
-    void print() const {
+    void set(const std::string& key, const std::string& val){
+      params[key] = val;
+    }
+    void print(std::ostream& os = std::cout) const {
       for (const_iterator i = begin(); i != end(); ++i)
-        io::pretty_print(i->first, i->second);
+        util::pretty_print(i->first, i->second, "", os);
     }
   private:
     map_t params;

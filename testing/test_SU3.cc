@@ -2,9 +2,9 @@ int PTORD = 6;
 
 #include "gtest/gtest.h"
 #include "Helper.h"
-#include <MyMath.h>
-
-MyRand r(23797);
+double Rand(){
+  return rand()/RAND_MAX;
+}
 
 TEST(SU3, Multiplication){
   //

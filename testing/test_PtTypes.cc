@@ -37,3 +37,14 @@ TEST(PtMatrix, AddAssign){
   for (int i = 0; i < ORD; ++i)
     ASSERT_TRUE( SU3Cmp(A[i],B[i])() );
 }
+
+TEST(PtMatrix, reHrandom){
+  ranlxd::Rand r(8126729);
+  ptt::PtMatrix<ORD> A, B;
+  for (int i = 0; i < ORD; ++i){
+    A[i] = sun::SU3rand(r);
+    B[i] = A[i];
+  }
+  B.reH();
+  for (int i = 0; i < ORD; ++i)  ASSERT_TRUE( SU3Cmp(A[i],B[i])() );
+}

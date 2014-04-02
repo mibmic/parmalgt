@@ -1,0 +1,80 @@
+\documentclass[a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+
+\newcommand{\ct}{\ensuremath{c_t}}
+\newcommand{\expv}[1]{\ensuremath{\langle{#1}\rangle}}
+\newcommand{\expvz}[1]{\ensuremath{\langle{#1}\rangle_{\raisebox{-.25em}{\scriptsize 0}}}}
+
+\title{Expectation values and the improvement coefficient \ct.}
+
+\begin{document}
+
+\maketitle
+
+We work in the Schrödinger Functional scheme with action $S$ and
+improvement coefficient \ct\ given as in \cite{Luscher:1992an}. We
+have
+%
+\begin{equation}
+  c_t = 1 + g_0^2 \dot c_t,\quad \dot c_t = c_t^{(1)} + g_0^2\,c_t^{(2)}.
+\end{equation}
+%
+With that we can write the action as
+%
+\begin{equation}
+  S(c_t) = S_0 + g_0^2 \,\dot c_t \,S_1 \equiv S_0 + \alpha\, S_1,
+\end{equation}
+%
+and the partition function (from now on equations hold up to $O(\alpha^3)$)
+%
+\begin{align}
+  Z &= \int \mathrm{d}U\; e^{-S(c_t)} \approx \int \mathrm{d}U\; e^{-S_0}
+  \left( 1 - \alpha S_1 + \frac{\alpha^2}2 S_1^2 \right) \\
+  &= Z_0 \left( 1 - \alpha
+  \expvz{S_1} + \frac{\alpha^2}2 \expvz{S_1^2} \right).
+\end{align}
+% 
+We introduced
+%
+\begin{equation}
+  \expvz \cdot  \equiv \frac 1 {Z_0} \int \mathrm{d}U\; \cdot \,e^{-S_0}.
+\end{equation}
+%
+We then get for a generic expectation value
+%
+\begin{align}
+%  \nonumber
+%  \expv{\cal O} = \frac 1 Z \int \mathrm{d}U\; {\cal O} \,e^{-S}\\
+  \nonumber
+  \expv{\cal O} = \frac 1 Z \int \mathrm{d}U\; {\cal O} \,e^{-S} \approx\;& \frac 1 {Z_0} \left( 1 + \alpha \, \expvz{S_1} +
+    \alpha^2\left[\expvz{S_1}^2 - \frac {\expvz{S_1^2}} 2 \right]\right) \\
+  \nonumber
+  &\times \int \mathrm{d}U\; {\cal O} \,e^{-S_0} \left( 1  - \alpha
+  \expvz{S_1} + \frac {\alpha^2}2 \expvz{S_1^2} \right)\\
+\equiv \;&{\cal O}_0 + \alpha {\cal O}_1 + \alpha^2 {\cal
+    O}_2 + O(\alpha^3)\,.
+\end{align}
+%
+The coefficients are
+%
+\begin{align}
+  {\cal O}_0 = \expvz{\cal O},\quad {\cal O}_1 = -\expvz{{\cal O} \,S_1}
+  + \expvz{\cal O}\expvz{S_1}\,,\\
+  {\cal O}_2 = \expvz{\cal O} \left( \expvz{S_1}^2 - \frac
+    {\expvz{S_1^2}} 2
+  \right)
+  - \expvz{S_1} \expvz{{\cal O}\,S_1} + \frac{\expvz{{\cal
+        O}\,S_1^2}} 2\,.
+\end{align}
+\begin{thebibliography}{99}
+\bibitem{Luscher:1992an} 
+  M.~Luscher, R.~Narayanan, P.~Weisz and U.~Wolff,
+  %``The Schrodinger functional: A Renormalizable probe for nonAbelian gauge theories,''
+  Nucl.\ Phys.\ B {\bf 384}, 168 (1992)
+  [hep-lat/9207009].
+  %%CITATION = HEP-LAT/9207009;%%
+\end{thebibliography}
+
+\end{document}

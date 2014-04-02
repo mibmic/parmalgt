@@ -1,0 +1,21 @@
+This is work in progress! Here's our todo list:
+
+* Analysis code
+- [ ] Keep Ulli's method 
+- [ ] But, for now also use the naive error propagation
+- [ ] Make folder based
+- [ ] Clean it up
+** delta_1, delta_2
+- [ ] different discretizations s \in {0, \pm 1}
+- [ ] figure out the formulae (for delta 2)
+- [ ] deal with c_t 
+      - do we want to include it in the action or a posteriori
+
+
+* Main code 
+- [ ] Make googletest optional
+** Observables
+   - [X] Vbar - Already in the repo??
+   - [ ] Is it implemented correctly???
+** Higher order integration
+** Fermions
