@@ -19,10 +19,10 @@ AC_LANG_CPLUSPLUS
 
 # Checks for c++0x and c++11
 AX_CXX_COMPILE_STDCXX_0X
-AM_CONDITIONAL(HAVE_STDCXX_0X, test "x$ax_cv_cxx_compile_cxx0x_cxx" == "xyes")
+AM_CONDITIONAL(HAVE_STDCXX_0X, test "x$ax_cxx_compile_stdcxx_0x" == "xyes")
 
 AX_CXX_COMPILE_STDCXX_11
-AM_CONDITIONAL(HAVE_STDCXX_11, test "x$ax_cv_cxx_compile_cxx11_cxx" == "xyes")
+AM_CONDITIONAL(HAVE_STDCXX_11, test "x$ax_cxx_compile_cxx11_cxx" == "xyes")
 
 # Checks for header files.
 AC_CHECK_HEADERS([fenv.h inttypes.h limits.h stdlib.h string.h sys/time.h unistd.h])

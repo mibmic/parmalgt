@@ -85,7 +85,12 @@ typedef std::vector<ScalarFermionField> FermionField;
 
 typedef kernels::StapleSqKernel<GluonField> StSqK;
 typedef kernels::StapleReKernel<GluonField> StReK;
+#ifndef IMP_ACT
+typedef StSqK StK;
+#else
 typedef StReK StK;
+#endif
+
 
 typedef kernels::ZeroModeSubtractionKernel<GluonField> ZeroModeSubtractionKernel;
 
@@ -94,10 +99,6 @@ typedef kernels::SetBgfKernel<GluonField> SetBgfKernel;
 
 // ... and for the measurements ...
 typedef kernels::MeasureNormKernel<GluonField> MeasureNormKernel;
-// typedef kernels::GammaUpperKernel<GluonField, kernels::init_helper_gamma> GammaUpperKernel;
-// typedef kernels::GammaLowerKernel<GluonField, kernels::init_helper_gamma> GammaLowerKernel;
-// typedef kernels::GammaUpperKernel<GluonField, kernels::init_helper_vbar> VbarUpperKernel;
-// typedef kernels::GammaLowerKernel<GluonField, kernels::init_helper_vbar> VbarLowerKernel;
 typedef kernels::UdagUKernel<GluonField> UdagUKernel;
 typedef kernels::PlaqKernel<GluonField> PlaqKernel;
 
